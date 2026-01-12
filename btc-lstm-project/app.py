@@ -6,10 +6,28 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from pathlib import Path
 import sys
-# 현재 app.py가 있는 폴더를 Python 경로에 추가
-current_dir = os.path.dirname(os.path.abspath(__file__))
-if current_dir not in sys.path:
-    sys.path.append(current_dir)
+import os
+from pathlib import Path
+
+# 현재 파일(app.py)의 부모 디렉토리('btc-lstm-project')를 절대 경로로 취득
+BASE_DIR = Path(__file__).resolve().parent
+
+# Python이 모듈을 찾는 경로 최상단에 추가
+if str(BASE_DIR) not in sys.path:
+    sys.path.insert(0, str(BASE_DIR))
+
+# 이제 model.py를 가져옵니다.
+try:
+    from model import LSTMModel, DLinearModel, PatchTSTModel, TCNModel, iTransformerModel
+except ImportError as e:
+    import streamlit as st
+    st.error(f"모듈 로드 실패 세부 정보: {e}")
+    # 어떤 모듈에서 에러가 났는지 로그에 더 자세히 출력
+    raise e
+
+
+
+
 
 # 기존 프로젝트 파일에서 모델 클래스와 데이터 처리 함수 임포트
 # (사용자님의 model.py와 data_utils.py 내용에 따라 수정이 필요할 수 있습니다)
@@ -103,5 +121,6 @@ if st.sidebar.checkbox("디버깅 경로 확인"):
     st.sidebar.write(f"WEIGHTS_DIR: {WEIGHTS_DIR}")
     if WEIGHTS_DIR.exists():
         st.sidebar.write("존재하는 가중치 파일:", os.listdir(WEIGHTS_DIR))
+
 
 
