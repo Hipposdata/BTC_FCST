@@ -36,12 +36,16 @@ def fetch_btc_ohlcv(limit=2000):
     # 최근 데이터만 반환
     return df.tail(limit)
 
-def create_sequences(data, seq_length):
-    """LSTM 학습을 위한 윈도우 시퀀스 생성"""
+def create_sequences(data, seq_length, prediction_days=7, target_col_idx=0):
+    """
+    prediction_days: 예측하고 싶은 미래 일수 (7일)
+    """
     xs, ys = [], []
-    for i in range(len(data) - seq_length):
+    # 데이터를 7일치 더 남겨두고 루프를 돌아야 합니다.
+    for i in range(len(data) - seq_length - prediction_days + 1):
         x = data[i:(i + seq_length)]
-        y = data[i + seq_length]
+        # 타겟: i + seq_length 부터 7일간의 종가 데이터
+        y = data[i + seq_length : i + seq_length + prediction_days, target_col_idx]
         xs.append(x)
         ys.append(y)
     return np.array(xs), np.array(ys)
