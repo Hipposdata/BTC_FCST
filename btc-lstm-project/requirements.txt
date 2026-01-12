@@ -8,3 +8,22 @@ plotly
 joblib
 ccxt
 matplotlib
+
+# 기초 및 웹 대시보드
+streamlit
+numpy
+pandas
+matplotlib
+
+# 딥러닝 프레임워크 (가중치 파일 .pth 로드용)
+torch
+torchvision
+
+# 데이터 전처리 및 스케일러 (scaler.pkl 로드용)
+scikit-learn
+
+# 고급 시계열 모델(iTransformer, PatchTST 등)에서 자주 사용되는 라이브러리
+einops
+
+# 비트코인 데이터를 실시간으로 받아온다면 필요
+yfinance
