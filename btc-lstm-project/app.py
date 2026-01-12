@@ -42,21 +42,18 @@ WEIGHTS_DIR = BASE_DIR / "weights"
 # --- 2. 모델 로드 함수 (캐싱 적용) ---
 @st.cache_resource
 def get_model(name):
-    """모델 이름에 따라 객체를 생성하고 가중치를 로드합니다."""
-    # 1. 모델 객체 생성 (사용자님의 model.py 정의에 맞춰 파라미터 수정 필요)
+    # 각 모델별로 정의된 파라미터 기본값을 사용하여 객체 생성
     if name == "LSTM":
-        model = LSTMModel(input_size=1, hidden_size=64, num_layers=2)
+        return LSTMModel(input_size=8, hidden_size=128, num_layers=3, output_size=7)
     elif name == "DLinear":
-        model = DLinearModel(seq_len=96, pred_len=24)
+        return DLinear(seq_len=120, pred_len=7, input_size=8)
     elif name == "PatchTST":
-        model = PatchTSTModel()
-    elif name == "TCN":
-        model = TCNModel()
+        return PatchTST(input_size=8, seq_len=120, pred_len=7)
     elif name == "iTransformer":
-        model = iTransformerModel()
-    else:
-        # 기본 'model.pth' 처리
-        model = LSTMModel(input_size=1, hidden_size=64, num_layers=2)
+        return iTransformer(seq_len=120, pred_len=7, input_size=8)
+    elif name == "TCN":
+        return TCN(input_size=8, output_size=7)
+    return None
 
     # 2. 가중치 파일 경로 확인 및 로드
     weight_path = WEIGHTS_DIR / f"{name}.pth"
@@ -121,6 +118,7 @@ if st.sidebar.checkbox("디버깅 경로 확인"):
     st.sidebar.write(f"WEIGHTS_DIR: {WEIGHTS_DIR}")
     if WEIGHTS_DIR.exists():
         st.sidebar.write("존재하는 가중치 파일:", os.listdir(WEIGHTS_DIR))
+
 
 
 
