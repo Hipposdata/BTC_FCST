@@ -2,65 +2,63 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import os
+import numpy as np
 from sklearn.preprocessing import StandardScaler
+from data_utils import fetch_multi_data, create_sequences, save_scaler, TICKERS
+from model import LSTMModel, DLinear, PatchTST, iTransformer, TCN
 
-# data_utils에서 TICKERS와 필요한 함수들을 가져옵니다.
-from data_utils import fetch_multi_data, create_sequences, save_scaler, TICKERS 
-from model import LSTMModel
+device = torch.device("cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu")
+print(f"✅ 학습 장치: {device}")
 
-# 1. 데이터 준비 및 피처 정의
+# 1. 데이터 준비
 df = fetch_multi_data()
-
-# TICKERS의 키값들을 리스트로 변환하여 'features'를 정의합니다.
-# ['Bitcoin', 'DXY', 'Nasdaq', 'S&P500', 'US_10Y', 'Gold', 'VIX', 'WTI_Oil']
-features = list(TICKERS.keys()) 
-
+features = list(TICKERS.keys())
+btc_idx = features.index('Bitcoin')
 scaler = StandardScaler()
-scaled_data = scaler.fit_transform(df[features]) # 정의된 features 사용
+scaled_data = scaler.fit_transform(df[features])
 save_scaler(scaler)
 
-# 2. 하이퍼파라미터 설정
-seq_length = 120 # 과거 120일 데이터 사용
-prediction_days = 7 # 미래 7일 가격 예측
-btc_index = features.index('Bitcoin') # 비트코인 열 번호 찾기
+seq_length, prediction_days = 120, 7
+X, y = create_sequences(scaled_data, seq_length, prediction_days=prediction_days, target_col_idx=btc_idx)
+X_train, y_train = torch.tensor(X).float(), torch.tensor(y).float()
 
-# 시퀀스 생성
-X, y = create_sequences(
-    scaled_data, 
-    seq_length, 
-    prediction_days=prediction_days, 
-    target_col_idx=btc_index
-)
+# 2. 모델 리스트
+models = {
+    "LSTM": LSTMModel(input_size=len(features), output_size=prediction_days),
+    "DLinear": DLinear(seq_len=seq_length, pred_len=prediction_days, input_size=len(features)),
+    "PatchTST": PatchTST(input_size=len(features), seq_len=seq_length, pred_len=prediction_days),
+    "iTransformer": iTransformer(seq_len=seq_length, pred_len=prediction_days, input_size=len(features)),
+    "TCN": TCN(input_size=len(features), output_size=prediction_days)
+}
 
-X_train = torch.tensor(X).float()
-y_train = torch.tensor(y).float() # (샘플 수, 7) 형태
-
-# 3. 모델 설정
-# len(features)는 8이 됩니다.
-model = LSTMModel(input_size=len(features), output_size=prediction_days)
-criterion = nn.MSELoss()
-optimizer = optim.Adam(model.parameters(), lr=0.001)
-
-# 4. 학습 루프
-epochs = 50
-batch_size = 64
-for epoch in range(epochs):
-    model.train()
-    permutation = torch.randperm(X_train.size()[0])
-    for i in range(0, X_train.size()[0], batch_size):
-        indices = permutation[i:i+batch_size]
-        batch_x, batch_y = X_train[indices], y_train[indices]
-        
-        optimizer.zero_grad()
-        outputs = model(batch_x)
-        loss = criterion(outputs, batch_y)
-        loss.backward()
-        optimizer.step()
-    
-    if (epoch+1) % 10 == 0:
-        print(f"Epoch [{epoch+1}/{epochs}], Loss: {loss.item():.6f}")
-
-# 5. 저장
+# 3. 학습 루프
 os.makedirs('weights', exist_ok=True)
-torch.save(model.state_dict(), 'weights/model.pth')
-print("모델 및 스케일러 저장 완료!")
+epochs, batch_size = 50, 64
+
+for name, model in models.items():
+    print(f"\n🚀 {name} 학습 시작...")
+    model.to(device)
+    optimizer = optim.Adam(model.parameters(), lr=0.001)
+    criterion = nn.MSELoss()
+    
+    for epoch in range(epochs):
+        model.train()
+        permutation = torch.randperm(X_train.size()[0])
+        epoch_loss = 0
+        for i in range(0, X_train.size()[0], batch_size):
+            indices = permutation[i:i+batch_size]
+            batch_x, batch_y = X_train[indices].to(device), y_train[indices].to(device)
+            
+            optimizer.zero_grad()
+            outputs = model(batch_x)
+            loss = criterion(outputs, batch_y)
+            loss.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0) # 안정성 확보
+            optimizer.step()
+            epoch_loss += loss.item()
+            
+        if (epoch + 1) % 10 == 0:
+            print(f"[{name}] Epoch {epoch+1}/{epochs} | Loss: {epoch_loss/(len(X_train)/batch_size):.6f}")
+
+    torch.save(model.cpu().state_dict(), f'weights/{name}.pth')
+    print(f"✅ {name} 저장 완료")
