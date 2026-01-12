@@ -62,42 +62,53 @@ def update_backtest_data(current_date, current_price, prediction, next_day):
 # 페이지 1: 실시간 예측 (Live Predictor)
 # ---------------------------------------------------------
 if menu == "실시간 예측":
-    st.title("📈 BTC 실시간 예측")
+    st.title("📈 BTC 향후 7일 AI 예측")
     
-    # 데이터 수집 및 추론
-    df = fetch_btc_ohlcv(limit=100)
-    if df is not None and not df.empty:
-        current_price = df['close'].values[-1]
-        current_date = pd.to_datetime(df['timestamp'].values[-1]).date()
-        next_day = current_date + pd.Timedelta(days=1)
+    with st.spinner("최신 시장 데이터 분석 중..."):
+        df = fetch_multi_data()
+    
+    if not df.empty:
+        features = list(TICKERS.keys())
+        current_price = df['Bitcoin'].values[-1]
+        last_date = pd.to_datetime(df['timestamp'].values[-1])
+        
+        # 7일간의 날짜 생성
+        future_dates = [last_date + pd.Timedelta(days=i) for i in range(1, 8)]
 
         # 모델 추론
-        last_60 = scaler.transform(df[['close']].iloc[-60:].values)
-        input_tensor = torch.tensor(last_60).float().unsqueeze(0)
+        last_seq_scaled = scaler.transform(df[features].tail(120).values)
+        input_tensor = torch.tensor(last_seq_scaled).float().unsqueeze(0)
+        
         with torch.no_grad():
-            pred_val = model(input_tensor)
-            prediction = scaler.inverse_transform(pred_val.numpy())[0][0]
-
-        # 데이터 업데이트 수행
-        update_backtest_data(current_date, current_price, prediction, next_day)
+            preds_scaled = model(input_tensor).numpy()[0] # 7개의 예측값
+            
+        # 7개 예측값 각각 역스케일링
+        predictions = []
+        btc_idx = features.index('Bitcoin')
+        for p in preds_scaled:
+            dummy = np.zeros((1, len(features)))
+            dummy[0, btc_idx] = p
+            predictions.append(scaler.inverse_transform(dummy)[0, btc_idx])
 
         # UI 표시
-        col1, col2 = st.columns(2)
-        col1.metric("현재가 (Today)", f"${current_price:,.2f}")
-        col2.metric("내일 예측가 (Tomorrow)", f"${prediction:,.2f}", delta=f"{prediction - current_price:,.2f}")
+        st.subheader(f"📅 향후 7일 예측가")
+        cols = st.columns(7)
+        for i, col in enumerate(cols):
+            col.metric(f"D+{i+1}", f"${predictions[i]:,.0f}")
 
+        # 차트 시각화
         fig = go.Figure()
-        fig.add_trace(go.Scatter(x=df['timestamp'], y=df['close'], name='Price History'))
-        fig.add_trace(go.Scatter(x=[pd.to_datetime(next_day)], y=[prediction], mode='markers+text', 
-                                 name='Prediction', text=[f"${prediction:,.0f}"], textposition="top center",
-                                 marker=dict(color='red', size=15, symbol='star')))
-        fig.update_layout(title="최근 가격 추이 및 내일 예측", template="plotly_white")
-        st.plotly_chart(fig, use_container_width=True)
+        # 과거 데이터 (최근 30일)
+        fig.add_trace(go.Scatter(x=df['timestamp'].tail(30), y=df['Bitcoin'].tail(30), name='Past Price'))
+        # 미래 예측 데이터
+        fig.add_trace(go.Scatter(x=future_dates, y=predictions, name='7-Day Forecast', 
+                                 line=dict(color='red', dash='dash', width=3),
+                                 mode='lines+markers'))
         
-        st.info(f"💡 마지막 업데이트: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-        if st.button("수동 새로고침"):
-            st.rerun()
+        fig.update_layout(title="비트코인 7일 예측 트렌드", template="plotly_white")
+        st.plotly_chart(fig, use_container_width=True)
 
+        
 # ---------------------------------------------------------
 # 페이지 2: 백테스트 분석 (Backtest Lab)
 # ---------------------------------------------------------
