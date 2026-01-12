@@ -2,22 +2,19 @@ import torch
 import torch.nn as nn
 
 class LSTMModel(nn.Module):
-    def __init__(self, input_size=1, hidden_size=64, num_layers=2, output_size=1):
+    # output_size를 7로 기본값 설정
+    def __init__(self, input_size=8, hidden_size=128, num_layers=3, output_size=7, dropout=0.2):
         super(LSTMModel, self).__init__()
         self.hidden_size = hidden_size
         self.num_layers = num_layers
         
-        # batch_first=True -> (batch, seq, feature)
-        self.lstm = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True)
-        self.fc = nn.Linear(hidden_size, output_size)
+        self.lstm = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True, dropout=dropout)
+        self.fc = nn.Linear(hidden_size, output_size) # 최종 출력이 7이 됨
 
     def forward(self, x):
-        # 초기 hidden state와 cell state 설정
         h0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(x.device)
         c0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(x.device)
         
         out, _ = self.lstm(x, (h0, c0))
-        # 마지막 타임스텝의 결과만 사용
-        out = self.fc(out[:, -1, :])
+        out = self.fc(out[:, -1, :]) # 마지막 시점의 hidden state에서 7일치 예측
         return out
-        
