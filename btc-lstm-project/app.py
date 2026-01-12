@@ -16,13 +16,13 @@ BASE_DIR = Path(__file__).resolve().parent
 if str(BASE_DIR) not in sys.path:
     sys.path.insert(0, str(BASE_DIR))
 
-# 이제 model.py를 가져옵니다.
+# app.py 상단
 try:
-    from model import LSTMModel, DLinearModel, PatchTSTModel, TCNModel, iTransformerModel
+    # model.py의 실제 클래스명에 맞춰 수정 (Model 접미사 제거 및 대소문자 일치)
+    from model import LSTMModel, DLinear, PatchTST, iTransformer, TCN
 except ImportError as e:
     import streamlit as st
-    st.error(f"모듈 로드 실패 세부 정보: {e}")
-    # 어떤 모듈에서 에러가 났는지 로그에 더 자세히 출력
+    st.error(f"모듈 로드 실패: {e}")
     raise e
 
 
@@ -121,6 +121,7 @@ if st.sidebar.checkbox("디버깅 경로 확인"):
     st.sidebar.write(f"WEIGHTS_DIR: {WEIGHTS_DIR}")
     if WEIGHTS_DIR.exists():
         st.sidebar.write("존재하는 가중치 파일:", os.listdir(WEIGHTS_DIR))
+
 
 
 
