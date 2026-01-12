@@ -1,48 +1,30 @@
-import streamlit as st
-import os
-import torch
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
-from pathlib import Path
 import sys
 import os
 from pathlib import Path
 
-# 현재 파일(app.py)의 부모 디렉토리('btc-lstm-project')를 절대 경로로 취득
+# --- 1. Python 경로 설정 ---
 BASE_DIR = Path(__file__).resolve().parent
-
-# Python이 모듈을 찾는 경로 최상단에 추가
 if str(BASE_DIR) not in sys.path:
     sys.path.insert(0, str(BASE_DIR))
 
-# app.py 상단
+import streamlit as st
+import torch
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+
+# --- 2. 로컬 모듈 임포트 (실제 클래스명과 일치시킴) ---
 try:
-    # model.py의 실제 클래스명에 맞춰 수정 (Model 접미사 제거 및 대소문자 일치)
+    # model.py에 정의된 정확한 클래스 이름들입니다.
     from model import LSTMModel, DLinear, PatchTST, iTransformer, TCN
 except ImportError as e:
-    import streamlit as st
     st.error(f"모듈 로드 실패: {e}")
     raise e
 
-
-
-
-
-# 기존 프로젝트 파일에서 모델 클래스와 데이터 처리 함수 임포트
-# (사용자님의 model.py와 data_utils.py 내용에 따라 수정이 필요할 수 있습니다)
-from model import LSTMModel, DLinearModel, PatchTSTModel, TCNModel, iTransformerModel
-from data_utils import prepare_data, inverse_transform
-
-# --- 1. 경로 설정 (가장 중요한 부분) ---
-# app.py 파일이 위치한 디렉토리를 기준으로 절대 경로를 설정합니다.
-BASE_DIR = Path(__file__).resolve().parent
-WEIGHTS_DIR = BASE_DIR / "weights"
-
-# --- 2. 모델 로드 함수 (캐싱 적용) ---
+# --- 3. 모델 로드 함수 ---
 @st.cache_resource
 def get_model(name):
-    # 각 모델별로 정의된 파라미터 기본값을 사용하여 객체 생성
+    # model.py의 __init__ 파라미터 기본값에 맞춰 생성합니다.
     if name == "LSTM":
         return LSTMModel(input_size=8, hidden_size=128, num_layers=3, output_size=7)
     elif name == "DLinear":
@@ -55,71 +37,36 @@ def get_model(name):
         return TCN(input_size=8, output_size=7)
     return None
 
-    # 2. 가중치 파일 경로 확인 및 로드
-    weight_path = WEIGHTS_DIR / f"{name}.pth"
-    
-    if not weight_path.exists():
-        st.error(f"모델 파일을 찾을 수 없습니다: {weight_path}")
-        return None
+# --- 4. Streamlit UI ---
+st.set_page_config(page_title="BTC Price Prediction", layout="wide")
+st.title("📈 Bitcoin Price Prediction")
 
-    try:
-        # Streamlit Cloud 환경을 위해 cpu로 매핑하여 로드
-        state_dict = torch.load(weight_path, map_location=torch.device('cpu'))
-        model.load_state_dict(state_dict)
-        model.eval()
-        return model
-    except Exception as e:
-        st.error(f"모델 로드 중 오류 발생: {e}")
-        return None
-
-# --- 3. Streamlit UI 레이아웃 ---
-st.set_page_config(page_title="Bitcoin Price Prediction", layout="wide")
-st.title("📈 Bitcoin Price Prediction Dashboard")
-st.sidebar.header("설정")
-
-# 모델 선택 (GitHub의 weights 폴더 내 파일명 기준)
+# 사이드바 설정
 model_option = st.sidebar.selectbox(
-    "사용할 모델을 선택하세요",
-    ["LSTM", "DLinear", "PatchTST", "TCN", "iTransformer"]
+    "모델 선택",
+    ["LSTM", "DLinear", "PatchTST", "iTransformer", "TCN"]
 )
 
-# 데이터 불러오기 및 예측 버튼
+# 경로 설정
+WEIGHTS_DIR = BASE_DIR / "weights"
+
 if st.sidebar.button("예측 실행"):
-    with st.spinner(f"{model_option} 모델로 예측 중..."):
-        # 1. 모델 로드
+    with st.spinner(f"{model_option} 로딩 중..."):
         model = get_model(model_option)
         
-        if model:
-            # 2. 데이터 준비 (data_utils.py 활용)
-            # 여기서는 예시 코드로 작성되었습니다. 실제 입력 텐서 준비 로직을 넣어주세요.
-            # input_tensor = prepare_data() 
+        # 가중치 파일 로드
+        weight_path = WEIGHTS_DIR / f"{model_option}.pth"
+        if weight_path.exists():
+            model.load_state_dict(torch.load(weight_path, map_location='cpu'))
+            model.eval()
+            st.success(f"{model_option} 모델 로드 완료!")
             
-            # 임의의 데이터 시뮬레이션 (테스트용)
-            input_tensor = torch.randn(1, 96, 1) 
-            
-            # 3. 예측 수행
-            with torch.no_grad():
-                preds_scaled = model(input_tensor).numpy()[0]
-            
-            # 4. 결과 시각화
-            st.subheader(f"Results: {model_option}")
-            
-            fig, ax = plt.subplots(figsize=(10, 5))
-            ax.plot(preds_scaled, label='Predicted Price', color='orange')
-            ax.set_title(f"Bitcoin Price Forecast ({model_option})")
-            ax.legend()
-            st.pyplot(fig)
-            
-            st.success("예측이 완료되었습니다!")
+            # (여기에 예측 및 시각화 로직 추가 가능)
+            st.info("예측 결과 시각화 준비 중...")
+        else:
+            st.error(f"가중치 파일을 찾을 수 없습니다: {weight_path.name}")
 
-# --- 4. 디버깅 정보 (필요시 사이드바 하단에 표시) ---
-if st.sidebar.checkbox("디버깅 경로 확인"):
-    st.sidebar.write(f"BASE_DIR: {BASE_DIR}")
-    st.sidebar.write(f"WEIGHTS_DIR: {WEIGHTS_DIR}")
-    if WEIGHTS_DIR.exists():
-        st.sidebar.write("존재하는 가중치 파일:", os.listdir(WEIGHTS_DIR))
-
-
-
-
-
+# 디버깅용 정보
+if st.sidebar.checkbox("시스템 경로 확인"):
+    st.write("BASE_DIR:", BASE_DIR)
+    st.write("파일 목록:", os.listdir(BASE_DIR))
