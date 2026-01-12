@@ -5,7 +5,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 from pathlib import Path
-
+import sys
 # 현재 app.py가 있는 폴더를 Python 경로에 추가
 current_dir = os.path.dirname(os.path.abspath(__file__))
 if current_dir not in sys.path:
@@ -103,4 +103,5 @@ if st.sidebar.checkbox("디버깅 경로 확인"):
     st.sidebar.write(f"WEIGHTS_DIR: {WEIGHTS_DIR}")
     if WEIGHTS_DIR.exists():
         st.sidebar.write("존재하는 가중치 파일:", os.listdir(WEIGHTS_DIR))
+
 
