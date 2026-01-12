@@ -24,6 +24,8 @@ scikit-learn
 
 # 고급 시계열 모델(iTransformer, PatchTST 등)에서 자주 사용되는 라이브러리
 einops
+sympy
 
 # 비트코인 데이터를 실시간으로 받아온다면 필요
 yfinance
+
