@@ -6,6 +6,11 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from pathlib import Path
 
+# 현재 app.py가 있는 폴더를 Python 경로에 추가
+current_dir = os.path.dirname(os.path.abspath(__file__))
+if current_dir not in sys.path:
+    sys.path.append(current_dir)
+
 # 기존 프로젝트 파일에서 모델 클래스와 데이터 처리 함수 임포트
 # (사용자님의 model.py와 data_utils.py 내용에 따라 수정이 필요할 수 있습니다)
 from model import LSTMModel, DLinearModel, PatchTSTModel, TCNModel, iTransformerModel
@@ -98,3 +103,4 @@ if st.sidebar.checkbox("디버깅 경로 확인"):
     st.sidebar.write(f"WEIGHTS_DIR: {WEIGHTS_DIR}")
     if WEIGHTS_DIR.exists():
         st.sidebar.write("존재하는 가중치 파일:", os.listdir(WEIGHTS_DIR))
+
