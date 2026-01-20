@@ -2,11 +2,11 @@ name: Daily BTC Model Training
 
 on:
   schedule:
-    - cron: '0 0 * * *' # 매일 UTC 0시 (한국시간 오전 9시) 실행
-  workflow_dispatch: # 수동 실행 버튼 활성화
+    - cron: '0 0 * * *' # 매일 오전 9시 (한국시간) 실행
+  workflow_dispatch:    # 수동 실행 버튼 활성화
 
 permissions:
-  contents: write # 업데이트된 가중치 파일을 커밋하기 위한 권한
+  contents: write       # 가중치 파일 저장을 위한 권한
 
 jobs:
   train:
@@ -26,12 +26,18 @@ jobs:
           pip install -r requirements.txt
 
       - name: Run training
-        run: python train.py # 최신 데이터를 가져와 학습 후 model.pth 생성
+        env:
+          # GitHub Settings에 등록한 키를 불러옵니다
+          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+        run: python train.py
 
       - name: Commit and Push weights
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git add weights/model.pth weights/scaler.pkl
-          git commit -m "Auto-update model weights: $(date +'%Y-%m-%d')" || exit 0
-          git push
+          
+          # 모든 .pth 파일과 스케일러 파일 추가
+          git add weights/*.pth weights/scaler.pkl
+          
+          # 변경 사항이 있을 때만 커밋 & 푸시
+          git diff --quiet && git diff --staged --quiet || (git commit -m "🤖 Auto-update Model Weights: $(date +'%Y-%m-%d')" && git push)
