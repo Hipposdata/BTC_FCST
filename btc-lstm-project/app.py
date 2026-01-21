@@ -30,7 +30,7 @@ if "feedzai" not in alt.themes.names():
 # ------------------------------------------------------------------------------
 st.set_page_config(
     page_title="TOBIT | From Data to Bitcoin",
-    page_icon="🐻",
+    page_icon="assets/logo.png",  # 로고 파일 경로
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -443,3 +443,4 @@ elif menu == "⚡ Strategy Backtest":
 
 st.markdown("---")
 st.markdown("<div style='text-align:center; color:#8b949e; font-size:12px;'>TOBIT v2.1 | Deep Learning Time Series Forecasting</div>", unsafe_allow_html=True)
+
