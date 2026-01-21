@@ -6,7 +6,7 @@ dependencies:
   - pip
   - pip:
     - --extra-index-url https://download.pytorch.org/whl/cpu
-    - streamlit==1.52.1
+    - streamlit==1.50.0   # [수정] 1.52.1 -> 1.50.0 (Python 3.9 호환 버전)
     - torch==2.5.1
     - numpy==1.26.4
     - pandas==2.2.3
