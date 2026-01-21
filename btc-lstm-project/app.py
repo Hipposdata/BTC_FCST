@@ -27,12 +27,11 @@ if "feedzai" not in alt.themes.names():
 # ------------------------------------------------------------------------------
 # 1. Page Config & TOBIT Theme CSS
 # ------------------------------------------------------------------------------
-# [수정] 현재 파일(app.py)의 절대 경로를 구해서 assets 경로를 정확히 지정합니다.
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 LOGO_PATH = os.path.join(BASE_DIR, "assets", "logo.png")
 
 st.set_page_config(
-    page_title="TOBIT | From Data to Bitcoin",
+    page_title="TOBIT | AI Crypto Platform",
     page_icon="🐻",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -108,13 +107,13 @@ except ImportError:
     st.stop()
 
 # ------------------------------------------------------------------------------
-# 4. Helper Functions (Visualization) - [수정됨: 그래프 크기 키움]
+# 4. Helper Functions (Visualization)
 # ------------------------------------------------------------------------------
 def get_pruning_plot(plot_data, pruning_idx, title="Pruning Plot"):
     if plot_data is None: return None
     df_plot = pd.DataFrame([{'Index': item[1], 'Value': item[2]} for item in plot_data]) if isinstance(plot_data, list) else plot_data.copy()
     
-    fig, ax = plt.subplots(figsize=(10, 4)) # figsize 확대
+    fig, ax = plt.subplots(figsize=(10, 4))
     fig.patch.set_facecolor('#0b0e11')
     ax.set_facecolor('#0b0e11')
     ax.spines['bottom'].set_color('#8b949e'); ax.spines['left'].set_color('#8b949e')
@@ -135,7 +134,7 @@ def get_event_heatmap(df, title):
         df_plot = df_plot.sort_values('sort_key', ascending=False).drop(columns=['sort_key'])
     except: pass
     
-    fig, ax = plt.subplots(figsize=(8, 6)) # figsize 확대
+    fig, ax = plt.subplots(figsize=(8, 6))
     sns.heatmap(df_plot.pivot_table(index='Feature', values='Shapley Value'), 
                 cmap='coolwarm', center=0, annot=True, fmt=".3f", 
                 ax=ax, cbar=False, annot_kws={"size": 10})
@@ -149,7 +148,7 @@ def get_feature_bar(df, title):
     df_plot['abs_val'] = df_plot['Shapley Value'].abs()
     df_plot = df_plot.sort_values(by='abs_val', ascending=False).head(10)
     
-    fig, ax = plt.subplots(figsize=(8, 5)) # figsize 확대
+    fig, ax = plt.subplots(figsize=(8, 5))
     fig.patch.set_facecolor('#0b0e11'); ax.set_facecolor('#0b0e11')
     ax.spines['bottom'].set_color('#8b949e'); ax.spines['left'].set_color('#8b949e')
     ax.tick_params(colors='#8b949e', labelsize=10)
@@ -159,7 +158,7 @@ def get_feature_bar(df, title):
 
 def get_cell_heatmap(cell_df, title):
     if cell_df is None or cell_df.empty: return None
-    fig, ax = plt.subplots(figsize=(10, 6)) # figsize 확대
+    fig, ax = plt.subplots(figsize=(10, 6))
     sns.heatmap(cell_df.pivot(index='Feature', columns='Event', values='Shapley Value'), 
                 cmap='coolwarm', center=0, annot=True, fmt=".3f", 
                 ax=ax, cbar=False, annot_kws={"size": 9})
@@ -169,7 +168,7 @@ def get_cell_heatmap(cell_df, title):
 # ------------------------------------------------------------------------------
 # 5. Model Logic
 # ------------------------------------------------------------------------------
-WEIGHTS_DIR = os.path.join(BASE_DIR, 'weights') # 경로 수정
+WEIGHTS_DIR = os.path.join(BASE_DIR, 'weights')
 MODELS_LIST = ["MLP", "DLinear", "TCN", "LSTM", "PatchTST", "iTransformer"]
 MODEL_CLASSES = {"MLP": MLP, "DLinear": DLinear, "TCN": TCN, "LSTM": LSTMModel, "PatchTST": PatchTST, "iTransformer": iTransformer}
 
@@ -200,15 +199,16 @@ except: btc_idx = 0
 # 6. Sidebar & KPI
 # ------------------------------------------------------------------------------
 with st.sidebar:
-    # [수정] 위에서 구한 절대 경로(LOGO_PATH)를 사용
     if os.path.exists(LOGO_PATH): 
         st.image(LOGO_PATH, width=200)
     else: 
         st.markdown("## 🐻 **TOBIT**")
-        # 디버깅용: 경로가 틀렸을 때 어디를 찾고 있는지 표시하려면 아래 주석 해제
-        # st.caption(f"Logo not found at: {LOGO_PATH}")
     
-    st.markdown("### **TOBIT**\n*From Data to Bitcoin*")
+    # [수정됨: 사용자의 목표를 반영한 직관적인 설명]
+    st.markdown("### **TOBIT**")
+    st.markdown("**AI 기반 비트코인 투자 분석 플랫폼**")
+    st.caption("시계열 예측(Time-Series) 및 XAI 기법을 활용한 스마트 거래 전략")
+    
     st.markdown("---")
     menu = st.radio("MENU", ["📊 Market Forecast", "🧠 Deep Insight (XAI)", "📘 Model Specs", "⚡ Strategy Backtest"])
     st.markdown("---")
@@ -220,7 +220,6 @@ with st.sidebar:
 if menu != "📘 Model Specs":
     c_logo, c_title = st.columns([0.08, 0.92])
     with c_logo: 
-        # [수정] 메인 화면 로고에도 절대 경로 적용
         if os.path.exists(LOGO_PATH): 
             st.image(LOGO_PATH, width=50)
         else: 
@@ -447,4 +446,4 @@ elif menu == "⚡ Strategy Backtest":
                 st.dataframe(df_res, use_container_width=True)
 
 st.markdown("---")
-st.markdown("<div style='text-align:center; color:#8b949e; font-size:12px;'>TOBIT v2.1 | Deep Learning Time Series Forecasting</div>", unsafe_allow_html=True)
+st.markdown("<div style='text-align:center; color:#8b949e; font-size:12px;'>TOBIT v2.2 | AI-Driven Investment Analysis Platform</div>", unsafe_allow_html=True)
