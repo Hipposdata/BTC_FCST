@@ -3,7 +3,7 @@ channels:
   - defaults
 dependencies:
   - python=3.9
-  - python-graphviz  # [추가됨] 아키텍처 다이어그램을 그리기 위한 필수 도구
+  - python-graphviz
   - pip
   - pip:
     - --extra-index-url https://download.pytorch.org/whl/cpu
@@ -20,4 +20,5 @@ dependencies:
     - altair==4.2.2
     - yfinance==0.2.66
     - shap==0.41.0
-    - graphviz 
+    - graphviz
+    - requests  # [필수 추가] data_utils.py에서 사용함
