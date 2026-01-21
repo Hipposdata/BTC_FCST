@@ -214,3 +214,45 @@ def load_scaler(path='weights/scaler.pkl'):
     print("✅ 새로운 스케일러(13 features) 생성 및 저장 완료")
     
     return scaler
+
+# ---------------------------------------------------------
+# 4. 디스코드 알림 기능 (New!)
+# ---------------------------------------------------------
+def send_discord_message(title, description, fields=None, color=0x58a6ff):
+    """
+    Discord Webhook을 통해 메시지를 전송합니다.
+    """
+    if "DISCORD_WEBHOOK_URL" in st.secrets:
+        webhook_url = st.secrets["DISCORD_WEBHOOK_URL"]
+    else:
+        webhook_url = os.getenv('DISCORD_WEBHOOK_URL', '')
+        
+    if not webhook_url:
+        return False, "Webhook URL이 설정되지 않았습니다."
+
+    # 임베드(Embed) 메시지 포맷
+    embed = {
+        "title": title,
+        "description": description,
+        "color": color,
+        "footer": {"text": "TOBIT AI Analyst 🐻"},
+        "timestamp": datetime.now().isoformat()
+    }
+    
+    if fields:
+        embed["fields"] = fields
+
+    payload = {
+        "username": "TOBIT Bot",
+        "avatar_url": "https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/Animals/Bear.png",
+        "embeds": [embed]
+    }
+
+    try:
+        response = requests.post(webhook_url, json=payload)
+        if 200 <= response.status_code < 300:
+            return True, "전송 성공"
+        else:
+            return False, f"전송 실패 (Code: {response.status_code})"
+    except Exception as e:
+        return False, f"에러 발생: {e}"
