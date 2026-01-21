@@ -32,13 +32,8 @@ if "feedzai" not in alt.themes.names():
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 LOGO_PATH = os.path.join(BASE_DIR, "assets", "logo.png")
 
-try:
-    icon_img = Image.open(LOGO_PATH)
-except FileNotFoundError:
-    icon_img = "🪙" # 파일이 없을 경우를 대비한 기본 이모지 (비트코인 등)
-
 st.set_page_config(
-    page_title="TOBIT | From Data to Bitcoin",
+    page_title="TOBIT | Bitcoin Forecast",
     page_icon=icon_img,  # 여기에 문자열 대신 이미지 객체(icon_img)를 넣으세요
     layout="wide",
     initial_sidebar_state="expanded"
