@@ -12,7 +12,7 @@ import streamlit as st
 # ---------------------------------------------------------
 # 설정 및 상수
 # ---------------------------------------------------------
-FRED_API_KEY = os.getenv('FRED_API_KEY', '33f21fe5eacad6f3c9e71ca9ed7d0e1a')
+FRED_API_KEY = os.getenv('FRED_API_KEY', '5ba385251e03d0f1708b9f9b49390a8b')
 START_DATE = '2017-01-01'
 
 # 학습/예측에서 사용할 최종 변수 목록 (13개)
@@ -284,3 +284,4 @@ def load_scaler(path='weights/scaler.pkl'):
     joblib.dump(scaler, full_path)
     
     return scaler
+
