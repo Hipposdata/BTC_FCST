@@ -12,8 +12,14 @@ import streamlit as st
 # ---------------------------------------------------------
 # 설정 및 상수
 # ---------------------------------------------------------
-FRED_API_KEY = os.getenv('FRED_API_KEY', '5ba385251e03d0f1708b9f9b49390a8b')
-START_DATE = '2017-01-01'
+if "FRED_API_KEY" in st.secrets:
+    FRED_API_KEY = st.secrets["FRED_API_KEY"]
+else:
+    # 로컬 환경 변수나 다른 방법으로 시도 (없으면 에러 방지용 빈 값)
+    FRED_API_KEY = os.getenv('FRED_API_KEY', '')
+
+if not FRED_API_KEY:
+    print("⚠️ 경고: FRED API 키가 설정되지 않았습니다. 경제 데이터를 가져올 수 없습니다.")START_DATE = '2017-01-01'
 
 # 학습/예측에서 사용할 최종 변수 목록 (13개)
 FEATURE_COLUMNS = [
@@ -284,4 +290,5 @@ def load_scaler(path='weights/scaler.pkl'):
     joblib.dump(scaler, full_path)
     
     return scaler
+
 
