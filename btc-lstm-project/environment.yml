@@ -3,10 +3,11 @@ channels:
   - defaults
 dependencies:
   - python=3.9
+  - python-graphviz  # [추가됨] 아키텍처 다이어그램을 그리기 위한 필수 도구
   - pip
   - pip:
     - --extra-index-url https://download.pytorch.org/whl/cpu
-    - streamlit==1.50.0   # [수정] 1.52.1 -> 1.50.0 (Python 3.9 호환 버전)
+    - streamlit==1.50.0
     - torch==2.5.1
     - numpy==1.26.4
     - pandas==2.2.3
@@ -19,3 +20,4 @@ dependencies:
     - altair==4.2.2
     - yfinance==0.2.66
     - shap==0.41.0
+    - graphviz 
