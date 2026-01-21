@@ -15,14 +15,16 @@ import streamlit as st
 if "FRED_API_KEY" in st.secrets:
     FRED_API_KEY = st.secrets["FRED_API_KEY"]
 else:
+    # 로컬 환경 변수 혹은 빈 값
     FRED_API_KEY = os.getenv('FRED_API_KEY', '')
 
+# FRED 키 경고 (로그에만 출력)
 if not FRED_API_KEY:
-    print("⚠️ 경고: FRED API 키가 설정되지 않았습니다.")
+    print("⚠️ [System] FRED API 키가 설정되지 않았습니다. 경제 지표 수집이 제한됩니다.")
 
-START_DATE = '2017-01-01'
+START_DATE = '2023-01-01'
 
-# 13개 최종 변수 목록
+# 모델 학습에 사용되는 최종 13개 변수 목록
 FEATURE_COLUMNS = [
     'BTC_Close', 'BTC_Volume', 'ETH_Close',   # [YFinance] Crypto
     'US_M2', 'US_CPI',                        # [FRED] Economy
@@ -52,24 +54,45 @@ def fetch_market_data():
     
     try:
         tickers_list = list(symbols.keys())
-        df = yf.download(tickers_list, start=START_DATE, progress=False)
+        # [Fix] 최신 yfinance 이슈 대응을 위해 auto_adjust=True 설정
+        df = yf.download(tickers_list, start=START_DATE, progress=False, auto_adjust=True)
         
         data_frames = []
         for ticker, cols in symbols.items():
             for target_col in cols:
                 measure = 'Volume' if 'Volume' in target_col else 'Close'
+                series = pd.Series(dtype=float)
+
                 try:
+                    # Case 1: MultiIndex (Price, Ticker) 구조일 때
                     if isinstance(df.columns, pd.MultiIndex):
-                        series = df.xs(measure, level=0, axis=1)[ticker]
+                        try:
+                            # 레벨 확인 후 데이터 추출
+                            if measure in df.columns.get_level_values(0):
+                                series = df.xs(measure, level=0, axis=1)[ticker]
+                            else:
+                                # 컬럼 순서가 반대일 경우 (Ticker, Price)
+                                series = df.xs(ticker, level=1, axis=1)[measure]
+                        except KeyError:
+                            pass
+                    
+                    # Case 2: Single Index (단일 티커 다운로드 시)
                     else:
-                        if len(symbols) == 1: series = df[measure]
-                        else: series = df[measure][ticker] if ticker in df[measure].columns else pd.Series(dtype=float)
-                except KeyError:
-                    series = pd.Series(dtype=float)
-                
-                series.name = target_col
-                data_frames.append(series)
+                        if len(symbols) == 1: 
+                            series = df[measure]
+                        elif measure in df.columns:
+                            series = df[measure] # 이름이 매칭되는 경우
+                except Exception as e:
+                    print(f"⚠️ Column extraction failed for {ticker}: {e}")
+
+                # 시리즈가 비어있지 않다면 이름 설정 후 추가
+                if not series.empty:
+                    series.name = target_col
+                    data_frames.append(series)
         
+        if not data_frames:
+            return pd.DataFrame()
+
         df_market = pd.concat(data_frames, axis=1)
         df_market.index = df_market.index.normalize()
         return df_market
@@ -79,7 +102,7 @@ def fetch_market_data():
         return pd.DataFrame()
 
 def fetch_fred():
-    """FRED (CPI, M2)"""
+    """FRED (CPI, M2) - 월간 데이터를 일간으로 변환"""
     print("Fetching FRED Data...")
     
     if not FRED_API_KEY:
@@ -87,14 +110,23 @@ def fetch_fred():
 
     try:
         fred = Fred(api_key=FRED_API_KEY)
-        cpi = fred.get_series('CPIAUCSL', observation_start=START_DATE)
-        m2 = fred.get_series('M2SL', observation_start=START_DATE)
-        
-        if cpi is None: cpi = pd.Series(dtype=float)
-        if m2 is None: m2 = pd.Series(dtype=float)
+        # FRED 데이터 호출 시 에러 방지용 try-except
+        try:
+            cpi = fred.get_series('CPIAUCSL', observation_start=START_DATE)
+        except:
+            cpi = pd.Series(dtype=float)
             
+        try:
+            m2 = fred.get_series('M2SL', observation_start=START_DATE)
+        except:
+            m2 = pd.Series(dtype=float)
+        
         df = pd.DataFrame({'US_CPI': cpi, 'US_M2': m2})
+        if df.empty:
+            return df
+            
         df.index = pd.to_datetime(df.index).normalize()
+        # 월간 데이터를 일간으로 채우기 (Forward Fill)
         return df.resample('D').ffill()
     except Exception as e:
         print(f"⚠️ FRED API Error: {e}")
@@ -124,7 +156,6 @@ def fetch_sentiment():
 # ---------------------------------------------------------
 # 2. 메인 데이터 처리 함수
 # ---------------------------------------------------------
-@st.cache_data(ttl=3600)
 def fetch_multi_data():
     """모든 데이터를 수집하고 13개 변수로 정리하여 반환"""
     print("🚀 데이터 수집 및 전처리 시작...")
@@ -133,36 +164,43 @@ def fetch_multi_data():
     econ = fetch_fred()
     sent = fetch_sentiment()
     
-    if 'BTC_Close' not in market.columns:
+    if market.empty or 'BTC_Close' not in market.columns:
         print("🚨 Critical: BTC Data missing")
         return pd.DataFrame(columns=['timestamp'] + FEATURE_COLUMNS)
 
+    # 데이터 병합 (Outer Join으로 날짜 확보)
     df = market.join([econ, sent], how='outer')
     df.sort_index(inplace=True)
-    df.fillna(method='ffill', inplace=True)
-    df.dropna(inplace=True)
     
+    # 결측치 처리 (주말/공휴일 등)
+    df.fillna(method='ffill', inplace=True) # 앞의 값으로 채움
+    df.dropna(inplace=True) # 그래도 비어있는 초기 데이터 삭제
+    
+    # [기술적 지표 계산]
     close = df['BTC_Close']
     
-    # RSI
+    # RSI (14)
     delta = close.diff()
     gain = (delta.where(delta > 0, 0)).rolling(14).mean()
     loss = (-delta.where(delta < 0, 0)).rolling(14).mean()
     rs = gain / loss
     df['RSI'] = 100 - (100 / (1 + rs))
     
-    # MACD
+    # MACD (12, 26)
     ema12 = close.ewm(span=12, adjust=False).mean()
     ema26 = close.ewm(span=26, adjust=False).mean()
     df['MACD'] = ema12 - ema26
     
+    # 최종 변수 필터링
     available_cols = [c for c in FEATURE_COLUMNS if c in df.columns]
     
-    if len(available_cols) < 5:
+    # 데이터가 너무 적거나 컬럼이 부족하면 빈 DF 반환
+    if len(available_cols) < 5 or len(df) < 30:
          return pd.DataFrame(columns=['timestamp'] + FEATURE_COLUMNS)
          
     df = df[available_cols].dropna()
     
+    # 인덱스를 timestamp 컬럼으로 리셋
     df_reset = df.reset_index()
     if 'Date' in df_reset.columns:
         df_reset.rename(columns={'Date': 'timestamp'}, inplace=True)
@@ -196,9 +234,12 @@ def load_scaler(path='weights/scaler.pkl'):
 
     # 2. 스케일러 새로 만들기 (차원이 안 맞거나 파일이 없을 때)
     from sklearn.preprocessing import StandardScaler
+    
+    # 데이터를 새로 받아와서 학습
     df = fetch_multi_data()
     
     if df.empty: 
+        print("🚨 데이터가 없어 스케일러를 학습할 수 없습니다. 빈 스케일러 반환.")
         return StandardScaler()
         
     # 현재 정의된 13개 컬럼만 학습
@@ -209,14 +250,17 @@ def load_scaler(path='weights/scaler.pkl'):
     scaler.fit(feature_data)
     
     # 저장
-    os.makedirs(os.path.dirname(full_path), exist_ok=True)
-    joblib.dump(scaler, full_path)
-    print("✅ 새로운 스케일러(13 features) 생성 및 저장 완료")
+    try:
+        os.makedirs(os.path.dirname(full_path), exist_ok=True)
+        joblib.dump(scaler, full_path)
+        print("✅ 새로운 스케일러(13 features) 생성 및 저장 완료")
+    except Exception as e:
+        print(f"⚠️ 스케일러 저장 실패: {e}")
     
     return scaler
 
 # ---------------------------------------------------------
-# 4. 디스코드 알림 기능 (New!)
+# 4. 디스코드 알림 기능
 # ---------------------------------------------------------
 def send_discord_message(title, description, fields=None, color=0x58a6ff):
     """
