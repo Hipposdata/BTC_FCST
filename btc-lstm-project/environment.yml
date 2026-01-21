@@ -21,4 +21,5 @@ dependencies:
     - yfinance==0.2.66
     - shap==0.41.0
     - graphviz
-    - requests  # [필수 추가] data_utils.py에서 사용함
+    - requests
+    - fredapi       # [추가] FRED 경제 데이터 API 라이브러리
