@@ -33,8 +33,8 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 LOGO_PATH = os.path.join(BASE_DIR, "assets", "logo.png")
 
 st.set_page_config(
-    page_title="TOBIT | AI Crypto Platform",
-    page_icon="🐻",
+    page_title="TOBIT | From Data to Bitcoin",
+    page_icon="assets/logo.png",  # 로고 파일 경로
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -709,3 +709,4 @@ elif menu == "⚡ Strategy Backtest":
 
 st.markdown("---")
 st.markdown("<div style='text-align:center; color:#8b949e; font-size:12px;'>TOBIT v2.5 | AI-Driven Investment Analysis Platform</div>", unsafe_allow_html=True)
+
