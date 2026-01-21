@@ -15,7 +15,8 @@ from openai import OpenAI
 import altair as alt
 import graphviz
 from datetime import datetime
-from PIL import Image
+from PIL import Image  # [필수] 이미지 처리를 위한 라이브러리
+
 # ==============================================================================
 # 0. [CRITICAL FIX] TimeSHAP Altair Theme Error Patch
 # ==============================================================================
@@ -32,19 +33,22 @@ if "feedzai" not in alt.themes.names():
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 LOGO_PATH = os.path.join(BASE_DIR, "assets", "logo.png")
 
-# [수정됨] icon_img 변수를 먼저 정의해야 합니다.
+# [수정됨] 이미지 로딩 안전장치 (PIL 사용)
 try:
-    icon_img = Image.open(LOGO_PATH)
-except FileNotFoundError:
-    icon_img = "🪙"  # 이미지가 없을 경우 기본 이모지 사용
+    if os.path.exists(LOGO_PATH):
+        icon_img = Image.open(LOGO_PATH)
+    else:
+        icon_img = "🪙" # 파일 없으면 이모지
+except Exception:
+    icon_img = "🪙"
 
-# [수정됨] 위에서 만든 icon_img 변수를 여기서 사용합니다.
 st.set_page_config(
     page_title="TOBIT | Bitcoin Forecast",
-    page_icon=icon_img,  
+    page_icon=icon_img, 
     layout="wide",
     initial_sidebar_state="expanded"
 )
+
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Roboto+Mono:wght@400;700&display=swap');
@@ -89,8 +93,9 @@ st.markdown("""
 if "UPSTAGE_API_KEY" in st.secrets:
     UPSTAGE_API_KEY = st.secrets["UPSTAGE_API_KEY"]
 else:
-    st.error("🚨 API 키가 없습니다. .streamlit/secrets.toml 파일을 확인해주세요.")
-    st.stop()
+    # 로컬 개발용 예외처리 (Secrets 없어도 앱이 죽지 않도록)
+    UPSTAGE_API_KEY = "dummy_key"
+    # st.warning("⚠️ API 키가 없습니다. AI 분석 기능이 제한됩니다.")
 
 BASE_URL = "https://api.upstage.ai/v1"
 client = OpenAI(api_key=UPSTAGE_API_KEY, base_url=BASE_URL)
@@ -111,7 +116,7 @@ try:
     from model import LSTMModel, DLinear, PatchTST, iTransformer, TCN, MLP
     from data_utils import fetch_multi_data, load_scaler, TICKERS, send_discord_message
 except ImportError as e:
-    st.error(f"🚨 필수 모듈 임포트 실패: {e}")
+    st.error(f"🚨 필수 모듈(model.py, data_utils.py) 임포트 실패: {e}")
     st.stop()
 except Exception as e:
     st.error(f"🚨 알 수 없는 오류: {e}")
@@ -181,7 +186,6 @@ def get_cell_heatmap(cell_df, title):
 # ------------------------------------------------------------------------------
 WEIGHTS_DIR = os.path.join(BASE_DIR, 'weights')
 MODELS_LIST = ["MLP", "DLinear", "TCN", "LSTM", "PatchTST", "iTransformer"]
-MODEL_CLASSES = {"MLP": MLP, "DLinear": DLinear, "TCN": TCN, "LSTM": LSTMModel, "PatchTST": PatchTST, "iTransformer": iTransformer}
 
 @st.cache_resource
 def get_model(name, seq_len):
@@ -209,8 +213,61 @@ def get_model(name, seq_len):
     model.eval()
     return model
 
-scaler, df = load_scaler(), fetch_multi_data()
+# ------------------------------------------------------------------------------
+# [NEW] Data Loading with Caching (하루 1회만 API 호출)
+# ------------------------------------------------------------------------------
+DATA_CACHE_PATH = os.path.join(BASE_DIR, "daily_btc_data.csv")
+
+def get_data_with_cache():
+    """
+    1. 오늘 날짜로 저장된 CSV가 있으면 로드
+    2. 없으면 API 호출 후 저장
+    """
+    today_str = datetime.now().strftime("%Y-%m-%d")
+    
+    # 1. 캐시 확인
+    if os.path.exists(DATA_CACHE_PATH):
+        try:
+            # 파일 수정 시간 확인
+            file_time = datetime.fromtimestamp(os.path.getmtime(DATA_CACHE_PATH)).strftime("%Y-%m-%d")
+            if file_time == today_str:
+                df = pd.read_csv(DATA_CACHE_PATH, index_col=0, parse_dates=True)
+                # 데이터가 너무 적으면 캐시 무시
+                if len(df) > 10:
+                    st.toast(f"📂 캐시된 데이터 로드 완료 ({today_str})")
+                    return df
+        except Exception:
+            pass
+
+    # 2. API 호출
+    with st.spinner("🔄 최신 데이터를 서버에서 받아오는 중입니다... (하루 1회)"):
+        try:
+            new_df = fetch_multi_data()
+            if new_df is not None and not new_df.empty and len(new_df) > 10:
+                new_df.to_csv(DATA_CACHE_PATH)
+                st.toast("✅ 데이터 업데이트 완료!")
+                return new_df
+            else:
+                # API 실패 시, 예전 데이터라도 있으면 로드
+                if os.path.exists(DATA_CACHE_PATH):
+                    st.warning("⚠️ 최신 데이터 로드 실패. 저장된 과거 데이터를 사용합니다.")
+                    return pd.read_csv(DATA_CACHE_PATH, index_col=0, parse_dates=True)
+        except Exception as e:
+            st.error(f"데이터 로드 에러: {e}")
+            if os.path.exists(DATA_CACHE_PATH):
+                return pd.read_csv(DATA_CACHE_PATH, index_col=0, parse_dates=True)
+    return None
+
+# 데이터 로드 및 검증
+scaler = load_scaler()
+df = get_data_with_cache()
 features = list(TICKERS.keys())
+
+# 데이터 비어있을 경우 앱 중단 방지
+if df is None or df.empty or len(df) < 5:
+    st.error("🚨 데이터를 불러올 수 없습니다. 잠시 후 다시 시도하거나, `pip install --upgrade yfinance`를 실행해주세요.")
+    st.stop()
+
 try: btc_idx = features.index('BTC_Close')
 except: btc_idx = 0
 
@@ -218,9 +275,13 @@ except: btc_idx = 0
 # 6. Sidebar & KPI
 # ------------------------------------------------------------------------------
 with st.sidebar:
-    if os.path.exists(LOGO_PATH): 
-        st.image(LOGO_PATH, width=200)
-    else: 
+    # 로고 표시
+    try:
+        if os.path.exists(LOGO_PATH):
+            st.image(Image.open(LOGO_PATH), width=200)
+        else:
+            st.markdown("## 🐻 **TOBIT**")
+    except:
         st.markdown("## 🐻 **TOBIT**")
     
     st.markdown("### **TOBIT**")
@@ -235,80 +296,79 @@ with st.sidebar:
     selected_model = st.selectbox("Target Model", MODELS_LIST, index=3)
     st.markdown(f"""<div style="background-color: #161b22; padding: 10px; border-radius: 8px; border: 1px solid #262a33; margin-top: 20px;"><div style="font-size: 11px; color: #8b949e;">SYSTEM STATUS</div><div style="display: flex; justify-content: space-between; margin-top: 5px;"><span style="color: #e6edf3; font-size: 12px;">Engine</span><span style="color: #3fb950; font-size: 12px;">● Online</span></div><div style="display: flex; justify-content: space-between; margin-top: 2px;"><span style="color: #e6edf3; font-size: 12px;">Model</span><span style="color: #58a6ff; font-size: 12px;">{selected_model}</span></div></div>""", unsafe_allow_html=True)
 
-    # [NEW] 디스코드 전송 버튼 (투자 신호 포함 버전)
+    # 디스코드 전송 버튼
     st.markdown("---")
     if st.button("🔔 Send Report to Discord"):
         with st.spinner("AI Analyzing Signal..."):
-            # 1. 모델 예측 수행 (투자 의견을 위해)
-            model = get_model(selected_model, selected_seq_len)
-            input_raw = df[features].tail(selected_seq_len).values
-            input_tensor = torch.tensor(scaler.transform(input_raw)).float().unsqueeze(0)
-            
-            with torch.no_grad():
-                preds_scaled = model(input_tensor).numpy()[0]
-            
-            # 7일 뒤 예측 가격 계산
-            dummy = np.zeros(len(features))
-            dummy[btc_idx] = preds_scaled[-1]
-            target_price = scaler.inverse_transform(dummy.reshape(1, -1))[0][btc_idx]
-            
-            # 2. 투자 시그널 결정
-            current_price = df['BTC_Close'].iloc[-1]
-            price_change_pct = ((target_price - current_price) / current_price) * 100
-            
-            if price_change_pct > 1.0:
-                signal = "STRONG BUY (매수) 🚀"
-                msg_color = 0x3fb950 # Green
-            elif price_change_pct < -1.0:
-                signal = "STRONG SELL (매도) 📉"
-                msg_color = 0xf85149 # Red
-            else:
-                signal = "HOLD (관망) ✋"
-                msg_color = 0xffeb3b # Yellow
+            try:
+                model = get_model(selected_model, selected_seq_len)
+                input_raw = df[features].tail(selected_seq_len).values
+                input_tensor = torch.tensor(scaler.transform(input_raw)).float().unsqueeze(0)
                 
-            # 3. 데이터 준비
-            last_rsi = df['RSI'].iloc[-1]
-            sentiment = df['Fear_Greed_Index'].iloc[-1]
-            
-            # 메시지 구성
-            fields = [
-                {"name": "💰 BTC Price", "value": f"${current_price:,.0f}", "inline": True},
-                {"name": "🎯 Target (7D)", "value": f"${target_price:,.0f} ({price_change_pct:+.2f}%)", "inline": True},
-                {"name": "🔮 AI Signal", "value": signal, "inline": False},
-                {"name": "📊 RSI (14)", "value": f"{last_rsi:.1f}", "inline": True},
-                {"name": "😨 Sentiment", "value": f"{sentiment:.0f}", "inline": True},
-                {"name": "🤖 Model", "value": selected_model, "inline": True}
-            ]
-            
-            success, msg = send_discord_message(
-                title="📢 TOBIT Investment Alert",
-                description=f"AI 모델({selected_model})이 분석한 최신 비트코인 투자 전략입니다.",
-                fields=fields,
-                color=msg_color
-            )
-            
-        if success:
-            st.success("전송 완료! 디스코드에서 투자 의견을 확인하세요.")
-        else:
-            st.error(f"전송 실패: {msg}")
+                with torch.no_grad():
+                    preds_scaled = model(input_tensor).numpy()[0]
+                
+                dummy = np.zeros(len(features))
+                dummy[btc_idx] = preds_scaled[-1]
+                target_price = scaler.inverse_transform(dummy.reshape(1, -1))[0][btc_idx]
+                
+                current_price = df['BTC_Close'].iloc[-1]
+                price_change_pct = ((target_price - current_price) / current_price) * 100
+                
+                if price_change_pct > 1.0:
+                    signal = "STRONG BUY (매수) 🚀"
+                    msg_color = 0x3fb950
+                elif price_change_pct < -1.0:
+                    signal = "STRONG SELL (매도) 📉"
+                    msg_color = 0xf85149
+                else:
+                    signal = "HOLD (관망) ✋"
+                    msg_color = 0xffeb3b
+                    
+                last_rsi = df['RSI'].iloc[-1]
+                sentiment = df['Fear_Greed_Index'].iloc[-1]
+                
+                fields = [
+                    {"name": "💰 BTC Price", "value": f"${current_price:,.0f}", "inline": True},
+                    {"name": "🎯 Target (7D)", "value": f"${target_price:,.0f} ({price_change_pct:+.2f}%)", "inline": True},
+                    {"name": "🔮 AI Signal", "value": signal, "inline": False},
+                    {"name": "📊 RSI (14)", "value": f"{last_rsi:.1f}", "inline": True},
+                    {"name": "😨 Sentiment", "value": f"{sentiment:.0f}", "inline": True},
+                    {"name": "🤖 Model", "value": selected_model, "inline": True}
+                ]
+                
+                success, msg = send_discord_message(
+                    title="📢 TOBIT Investment Alert",
+                    description=f"AI 모델({selected_model})이 분석한 최신 비트코인 투자 전략입니다.",
+                    fields=fields,
+                    color=msg_color
+                )
+                
+                if success:
+                    st.success("전송 완료! 디스코드에서 투자 의견을 확인하세요.")
+                else:
+                    st.error(f"전송 실패: {msg}")
+            except Exception as e:
+                st.error(f"분석 중 오류 발생: {e}")
 
 if menu != "📘 Model Specs":
     c_logo, c_title = st.columns([0.08, 0.92])
     with c_logo: 
-        if os.path.exists(LOGO_PATH): 
-            st.image(LOGO_PATH, width=50)
-        else: 
-            st.markdown("🐻")
+        st.write(icon_img) # 이모지 혹은 이미지 표시
     with c_title: st.markdown("<h2 style='margin-top: 5px;'>TOBIT Analysis Dashboard</h2>", unsafe_allow_html=True)
 
-    last_row, prev_row = df.iloc[-1], df.iloc[-2]
-    price_diff = last_row['BTC_Close'] - prev_row['BTC_Close']
-    def kpi(label, val, delta, color): return f"""<div class="kpi-card"><div class="kpi-label">{label}</div><div class="kpi-value">{val}</div><div class="kpi-delta {color}">{delta}</div></div>"""
-    c1, c2, c3, c4 = st.columns(4)
-    with c1: st.markdown(kpi("BTC Price", f"${last_row['BTC_Close']:,.0f}", f"{'▲' if price_diff>=0 else '▼'} {price_diff:+.2f}", "text-green" if price_diff>=0 else "text-red"), unsafe_allow_html=True)
-    with c2: st.markdown(kpi("Sentiment", f"{last_row['Fear_Greed_Index']:.0f}", "Extreme Greed" if last_row['Fear_Greed_Index']>75 else "Neutral", "text-blue"), unsafe_allow_html=True)
-    with c3: st.markdown(kpi("RSI (14)", f"{last_row['RSI']:.1f}", "Neutral", "text-green"), unsafe_allow_html=True)
-    with c4: st.markdown(kpi("US 10Y", f"{last_row['US_10Y']:.3f}%", "Macro Index", "text-blue"), unsafe_allow_html=True)
+    # [수정됨] 안전한 iloc 접근
+    if len(df) >= 2:
+        last_row, prev_row = df.iloc[-1], df.iloc[-2]
+        price_diff = last_row['BTC_Close'] - prev_row['BTC_Close']
+        def kpi(label, val, delta, color): return f"""<div class="kpi-card"><div class="kpi-label">{label}</div><div class="kpi-value">{val}</div><div class="kpi-delta {color}">{delta}</div></div>"""
+        c1, c2, c3, c4 = st.columns(4)
+        with c1: st.markdown(kpi("BTC Price", f"${last_row['BTC_Close']:,.0f}", f"{'▲' if price_diff>=0 else '▼'} {price_diff:+.2f}", "text-green" if price_diff>=0 else "text-red"), unsafe_allow_html=True)
+        with c2: st.markdown(kpi("Sentiment", f"{last_row['Fear_Greed_Index']:.0f}", "Extreme Greed" if last_row['Fear_Greed_Index']>75 else "Neutral", "text-blue"), unsafe_allow_html=True)
+        with c3: st.markdown(kpi("RSI (14)", f"{last_row['RSI']:.1f}", "Neutral", "text-green"), unsafe_allow_html=True)
+        with c4: st.markdown(kpi("US 10Y", f"{last_row['US_10Y']:.3f}%", "Macro Index", "text-blue"), unsafe_allow_html=True)
+    else:
+        st.warning("데이터가 부족하여 KPI를 표시할 수 없습니다.")
     st.markdown("<div style='margin-bottom: 25px;'></div>", unsafe_allow_html=True)
 
 # ------------------------------------------------------------------------------
@@ -331,9 +391,9 @@ if menu == "📊 Market Forecast":
             dummy[btc_idx] = p
             preds.append(scaler.inverse_transform(dummy.reshape(1, -1))[0][btc_idx])
             
-        future_dates = [pd.to_datetime(df['timestamp'].values[-1]) + pd.Timedelta(days=i) for i in range(1, 8)]
+        future_dates = [pd.to_datetime(df.index[-1]) + pd.Timedelta(days=i) for i in range(1, 8)]
         fig = go.Figure()
-        fig.add_trace(go.Scatter(x=df['timestamp'].tail(90), y=df['BTC_Close'].tail(90), name="Historical", mode='lines', line=dict(color='rgba(139, 148, 158, 0.5)', width=2), fill='tozeroy', fillcolor='rgba(139, 148, 158, 0.1)'))
+        fig.add_trace(go.Scatter(x=df.index[-90:], y=df['BTC_Close'].tail(90), name="Historical", mode='lines', line=dict(color='rgba(139, 148, 158, 0.5)', width=2), fill='tozeroy', fillcolor='rgba(139, 148, 158, 0.1)'))
         pred_color = '#3fb950' if preds[-1] > preds[0] else '#f85149'
         fig.add_trace(go.Scatter(x=future_dates, y=preds, name=f"TOBIT Forecast", mode='lines+markers', line=dict(color=pred_color, width=3), marker=dict(size=6, color='#161b22', line=dict(width=2, color=pred_color))))
         fig.update_layout(template='plotly_dark', paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=350, xaxis=dict(showgrid=False), yaxis=dict(showgrid=True, gridcolor='#262a33'), hovermode="x unified", margin=dict(l=20, r=20, t=30, b=20))
@@ -674,11 +734,9 @@ elif menu == "⚡ Strategy Backtest":
                     with torch.no_grad():
                         p_seq = model(hist_tensor[i:idx].unsqueeze(0)).numpy()[0]
                     
-                    # [SAFE FIX] Replaced one-liner with loop and explicit reshape
                     pred_prices = []
                     for p in p_seq:
                         d = np.zeros(len(features)); d[btc_idx] = p
-                        # reshape(1, -1) guarantees 2D array: (1, n_features)
                         pred_prices.append(scaler.inverse_transform(d.reshape(1, -1))[0][btc_idx])
                     
                     avg_pred = np.mean(pred_prices)
@@ -695,7 +753,7 @@ elif menu == "⚡ Strategy Backtest":
                     port_hist.append(total)
                     bh_hist.append((cur_price / data.iloc[selected_seq_len-1]['BTC_Close']) * cap)
                     
-                    res.append({"Date": data.iloc[idx-1]['timestamp'], "Price": cur_price, "Return(%)": round(ret_pct, 2), "Action": action, "Total": round(total, 2)})
+                    res.append({"Date": data.iloc[idx-1].name, "Price": cur_price, "Return(%)": round(ret_pct, 2), "Action": action, "Total": round(total, 2)})
                 
                 f_ret = (port_hist[-1] - cap) / cap * 100
                 b_ret = (bh_hist[-1] - cap) / cap * 100
@@ -707,15 +765,11 @@ elif menu == "⚡ Strategy Backtest":
                 
                 df_res = pd.DataFrame(res)
                 fig = go.Figure()
-                fig.add_trace(go.Scatter(x=df_res['Date'], y=port_hist, name="TOBIT", line=dict(color='#58a6ff', width=3)))
-                fig.add_trace(go.Scatter(x=df_res['Date'], y=bh_hist, name="Hold", line=dict(color='#8b949e', dash='dot')))
+                fig.add_trace(go.Scatter(x=df_res.index, y=port_hist, name="TOBIT", line=dict(color='#58a6ff', width=3)))
+                fig.add_trace(go.Scatter(x=df_res.index, y=bh_hist, name="Hold", line=dict(color='#8b949e', dash='dot')))
                 fig.update_layout(template='plotly_dark', paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=400, margin=dict(l=20, r=20, t=30, b=20))
                 st.plotly_chart(fig, use_container_width=True)
                 st.dataframe(df_res, use_container_width=True)
 
 st.markdown("---")
 st.markdown("<div style='text-align:center; color:#8b949e; font-size:12px;'>TOBIT v2.5 | AI-Driven Investment Analysis Platform</div>", unsafe_allow_html=True)
-
-
-
-
