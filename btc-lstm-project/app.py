@@ -15,7 +15,7 @@ from openai import OpenAI
 import altair as alt
 import graphviz
 from datetime import datetime
-
+from PIL import Image
 # ==============================================================================
 # 0. [CRITICAL FIX] TimeSHAP Altair Theme Error Patch
 # ==============================================================================
@@ -715,6 +715,7 @@ elif menu == "⚡ Strategy Backtest":
 
 st.markdown("---")
 st.markdown("<div style='text-align:center; color:#8b949e; font-size:12px;'>TOBIT v2.5 | AI-Driven Investment Analysis Platform</div>", unsafe_allow_html=True)
+
 
 
 
