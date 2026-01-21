@@ -19,7 +19,8 @@ else:
     FRED_API_KEY = os.getenv('FRED_API_KEY', '')
 
 if not FRED_API_KEY:
-    print("⚠️ 경고: FRED API 키가 설정되지 않았습니다. 경제 데이터를 가져올 수 없습니다.")START_DATE = '2017-01-01'
+    print("⚠️ 경고: FRED API 키가 설정되지 않았습니다. 경제 데이터를 가져올 수 없습니다.")
+START_DATE = '2023-01-01'
 
 # 학습/예측에서 사용할 최종 변수 목록 (13개)
 FEATURE_COLUMNS = [
@@ -290,5 +291,6 @@ def load_scaler(path='weights/scaler.pkl'):
     joblib.dump(scaler, full_path)
     
     return scaler
+
 
 
