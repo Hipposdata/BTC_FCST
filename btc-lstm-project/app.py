@@ -13,7 +13,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 from openai import OpenAI
 import altair as alt
-import graphviz  # [New] 아키텍처 다이어그램용
+import graphviz
+from datetime import datetime # [추가] 시간 표시용
 
 # ==============================================================================
 # 0. [CRITICAL FIX] TimeSHAP Altair Theme Error Patch
@@ -89,12 +90,12 @@ BASE_URL = "https://api.upstage.ai/v1"
 client = OpenAI(api_key=UPSTAGE_API_KEY, base_url=BASE_URL)
 
 # ------------------------------------------------------------------------------
-# 3. Import Dependencies
+# 3. Import Dependencies (Safe Import)
 # ------------------------------------------------------------------------------
 try:
     from timeshap.explainer import local_pruning, local_event, local_feat, local_cell_level
 except ImportError as e:
-    st.error(f"🚨 TimeSHAP 라이브러리 로드 실패: {e}")
+    st.error(f"🚨 TimeSHAP 로드 실패: {e}")
     st.stop()
 except Exception as e:
     st.error(f"🚨 TimeSHAP 초기화 오류: {e}")
@@ -102,9 +103,8 @@ except Exception as e:
 
 try:
     from model import LSTMModel, DLinear, PatchTST, iTransformer, TCN, MLP
-    from data_utils import fetch_multi_data, load_scaler, TICKERS
+    from data_utils import fetch_multi_data, load_scaler, TICKERS, send_discord_message # [추가] 디스코드 함수 임포트
 except ImportError as e:
-    # [수정] 이제 파일이 없다고 안 하고, 진짜 이유(e)를 말해줍니다.
     st.error(f"🚨 필수 모듈 임포트 실패 (라이브러리 누락 가능성): {e}")
     st.stop()
 except Exception as e:
@@ -171,7 +171,7 @@ def get_cell_heatmap(cell_df, title):
     return fig
 
 # ------------------------------------------------------------------------------
-# 5. Model Logic
+# 5. Model Logic (Robust Loading)
 # ------------------------------------------------------------------------------
 WEIGHTS_DIR = os.path.join(BASE_DIR, 'weights')
 MODELS_LIST = ["MLP", "DLinear", "TCN", "LSTM", "PatchTST", "iTransformer"]
@@ -179,8 +179,11 @@ MODEL_CLASSES = {"MLP": MLP, "DLinear": DLinear, "TCN": TCN, "LSTM": LSTMModel, 
 
 @st.cache_resource
 def get_model(name, seq_len):
+    # Data Utils에서 정의한 피처 개수를 자동으로 가져옴 (14개)
     input_size = len(TICKERS)
     pred_len = 7
+    
+    # 모델 초기화
     if name == "MLP": model = MLP(seq_len=seq_len, input_size=input_size, pred_len=pred_len)
     elif name == "DLinear": model = DLinear(seq_len=seq_len, pred_len=pred_len, input_size=input_size, kernel_size=25)
     elif name == "TCN": model = TCN(input_size=input_size, output_size=pred_len, num_channels=[64, 64, 64], kernel_size=3, dropout=0.2)
@@ -188,10 +191,18 @@ def get_model(name, seq_len):
     elif name == "PatchTST": model = PatchTST(input_size=input_size, seq_len=seq_len, pred_len=pred_len, patch_len=7, stride=3, d_model=64, n_heads=4, n_layers=2, dropout=0.2)
     elif name == "iTransformer": model = iTransformer(seq_len=seq_len, pred_len=pred_len, input_size=input_size, d_model=256, n_heads=4, n_layers=3, dropout=0.2)
     
+    # 가중치 파일 로드 시도
     path = os.path.join(WEIGHTS_DIR, f"{name}_{seq_len}.pth")
     if os.path.exists(path):
-        try: model.load_state_dict(torch.load(path, map_location='cpu', weights_only=True))
-        except: model.load_state_dict(torch.load(path, map_location='cpu'))
+        try:
+            state_dict = torch.load(path, map_location='cpu')
+            model.load_state_dict(state_dict)
+            print(f"✅ Loaded weights for {name}")
+        except RuntimeError as e:
+            print(f"⚠️ Weight mismatch for {name}. Using initialized model. Error: {e}")
+        except Exception as e:
+            print(f"⚠️ Error loading weights: {e}")
+            
     model.eval()
     return model
 
@@ -220,6 +231,34 @@ with st.sidebar:
     selected_seq_len = st.select_slider("Lookback Window", options=[14, 21, 45], value=14, format_func=lambda x: f"{x} Days")
     selected_model = st.selectbox("Target Model", MODELS_LIST, index=3)
     st.markdown(f"""<div style="background-color: #161b22; padding: 10px; border-radius: 8px; border: 1px solid #262a33; margin-top: 20px;"><div style="font-size: 11px; color: #8b949e;">SYSTEM STATUS</div><div style="display: flex; justify-content: space-between; margin-top: 5px;"><span style="color: #e6edf3; font-size: 12px;">Engine</span><span style="color: #3fb950; font-size: 12px;">● Online</span></div><div style="display: flex; justify-content: space-between; margin-top: 2px;"><span style="color: #e6edf3; font-size: 12px;">Model</span><span style="color: #58a6ff; font-size: 12px;">{selected_model}</span></div></div>""", unsafe_allow_html=True)
+
+    # [NEW] 디스코드 전송 버튼 추가됨!
+    st.markdown("---")
+    if st.button("🔔 Send Report to Discord"):
+        # 현재 상태 요약
+        last_btc = df['BTC_Close'].iloc[-1]
+        last_rsi = df['RSI'].iloc[-1]
+        sentiment = df['Fear_Greed_Index'].iloc[-1]
+        
+        # 메시지 구성
+        fields = [
+            {"name": "💰 BTC Price", "value": f"${last_btc:,.0f}", "inline": True},
+            {"name": "📊 RSI (14)", "value": f"{last_rsi:.1f}", "inline": True},
+            {"name": "😨 Sentiment", "value": f"{sentiment:.0f}", "inline": True},
+            {"name": "🤖 Selected Model", "value": selected_model, "inline": False}
+        ]
+        
+        with st.spinner("Sending..."):
+            success, msg = send_discord_message(
+                title="📢 TOBIT Daily Briefing",
+                description=f"현재 시장 상황 및 AI 모델({selected_model}) 설정 리포트입니다.",
+                fields=fields
+            )
+            
+        if success:
+            st.success("전송 완료!")
+        else:
+            st.error(f"전송 실패: {msg}")
 
 if menu != "📘 Model Specs":
     c_logo, c_title = st.columns([0.08, 0.92])
@@ -643,5 +682,4 @@ elif menu == "⚡ Strategy Backtest":
                 st.dataframe(df_res, use_container_width=True)
 
 st.markdown("---")
-st.markdown("<div style='text-align:center; color:#8b949e; font-size:12px;'>TOBIT v2.3 | AI-Driven Investment Analysis Platform</div>", unsafe_allow_html=True)
-
+st.markdown("<div style='text-align:center; color:#8b949e; font-size:12px;'>TOBIT v2.4 | AI-Driven Investment Analysis Platform</div>", unsafe_allow_html=True)
