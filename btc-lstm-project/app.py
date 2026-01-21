@@ -32,21 +32,19 @@ if "feedzai" not in alt.themes.names():
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 LOGO_PATH = os.path.join(BASE_DIR, "assets", "logo.png")
 
+# [수정됨] icon_img 변수를 먼저 정의해야 합니다.
+try:
+    icon_img = Image.open(LOGO_PATH)
+except FileNotFoundError:
+    icon_img = "🪙"  # 이미지가 없을 경우 기본 이모지 사용
+
+# [수정됨] 위에서 만든 icon_img 변수를 여기서 사용합니다.
 st.set_page_config(
     page_title="TOBIT | Bitcoin Forecast",
-    page_icon=icon_img,  # 여기에 문자열 대신 이미지 객체(icon_img)를 넣으세요
+    page_icon=icon_img,  
     layout="wide",
     initial_sidebar_state="expanded"
 )
-
-
-# st.set_page_config(
-#     page_title="TOBIT | From Data to Bitcoin",
-#     page_icon="assets/logo.png",  # 로고 파일 경로
-#     layout="wide",
-#     initial_sidebar_state="expanded"
-# )
-
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Roboto+Mono:wght@400;700&display=swap');
@@ -717,5 +715,6 @@ elif menu == "⚡ Strategy Backtest":
 
 st.markdown("---")
 st.markdown("<div style='text-align:center; color:#8b949e; font-size:12px;'>TOBIT v2.5 | AI-Driven Investment Analysis Platform</div>", unsafe_allow_html=True)
+
 
 
