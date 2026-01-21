@@ -3,3 +3,19 @@ channels:
   - defaults
 dependencies:
   - python=3.9
+  - pip
+  - pip:
+    - --extra-index-url https://download.pytorch.org/whl/cpu
+    - streamlit==1.52.1
+    - torch==2.5.1
+    - numpy==1.26.4
+    - pandas==2.2.3
+    - plotly==5.24.1
+    - scikit-learn
+    - matplotlib==3.7.5
+    - seaborn==0.13.2
+    - timeshap==1.0.4
+    - openai==2.15.0
+    - altair==4.2.2
+    - yfinance==0.2.66
+    - shap==0.41.0
