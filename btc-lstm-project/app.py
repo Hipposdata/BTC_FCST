@@ -12,11 +12,10 @@ from sklearn.preprocessing import StandardScaler
 import torch.nn as nn
 import torch.nn.functional as F
 from openai import OpenAI
-import altair as alt  # 에러 패치를 위해 필요
+import altair as alt
 
 # ==============================================================================
 # 0. [CRITICAL FIX] TimeSHAP Altair Theme Error Patch
-# Timeshap이 내부적으로 없는 테마를 호출하여 앱이 멈추는 것을 방지합니다.
 # ==============================================================================
 def placeholder_theme():
     return {"config": {}}
@@ -30,7 +29,7 @@ if "feedzai" not in alt.themes.names():
 # ------------------------------------------------------------------------------
 st.set_page_config(
     page_title="TOBIT | From Data to Bitcoin",
-    page_icon="assets/logo.png",  # 로고 파일 경로
+    page_icon="🐻",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -74,7 +73,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ------------------------------------------------------------------------------
-# 2. API Key Setup (Secrets)
+# 2. API Key Setup
 # ------------------------------------------------------------------------------
 if "UPSTAGE_API_KEY" in st.secrets:
     UPSTAGE_API_KEY = st.secrets["UPSTAGE_API_KEY"]
@@ -86,35 +85,35 @@ BASE_URL = "https://api.upstage.ai/v1"
 client = OpenAI(api_key=UPSTAGE_API_KEY, base_url=BASE_URL)
 
 # ------------------------------------------------------------------------------
-# 3. Import Dependencies (Patch Applied)
+# 3. Import Dependencies (Safe Import)
 # ------------------------------------------------------------------------------
 try:
     from timeshap.explainer import local_pruning, local_event, local_feat, local_cell_level
-except ImportError:
-    st.error("TimeSHAP 라이브러리 로드 실패. requirements.txt를 확인하세요.")
+except ImportError as e:
+    st.error(f"🚨 TimeSHAP 라이브러리 로드 실패: {e}")
+    st.stop()
 except Exception as e:
-    st.warning(f"TimeSHAP 초기화 경고 (무시 가능): {e}")
+    st.error(f"🚨 TimeSHAP 초기화 오류: {e}")
+    st.stop()
 
 try:
     from model import LSTMModel, DLinear, PatchTST, iTransformer, TCN, MLP
     from data_utils import fetch_multi_data, load_scaler, TICKERS
 except ImportError:
-    st.error("model.py 또는 data_utils.py 파일이 누락되었습니다.")
+    st.error("🚨 필수 파일(model.py, data_utils.py)이 누락되었습니다.")
+    st.stop()
 
 # ------------------------------------------------------------------------------
-# 4. Helper Functions (Compact Visualization)
+# 4. Helper Functions (Visualization)
 # ------------------------------------------------------------------------------
 def get_pruning_plot(plot_data, pruning_idx, title="Pruning Plot"):
     if plot_data is None: return None
     df_plot = pd.DataFrame([{'Index': item[1], 'Value': item[2]} for item in plot_data]) if isinstance(plot_data, list) else plot_data.copy()
-    
-    fig, ax = plt.subplots(figsize=(6, 2.5)) # Compact Size
+    fig, ax = plt.subplots(figsize=(6, 2.5))
     fig.patch.set_facecolor('#0b0e11')
     ax.set_facecolor('#0b0e11')
-    ax.spines['bottom'].set_color('#8b949e')
-    ax.spines['left'].set_color('#8b949e')
-    ax.tick_params(axis='both', colors='#8b949e', labelsize=8)
-    
+    ax.spines['bottom'].set_color('#8b949e'); ax.spines['left'].set_color('#8b949e')
+    ax.tick_params(colors='#8b949e', labelsize=8)
     ax.fill_between(df_plot.iloc[:, 1], df_plot.iloc[:, 2], color='#58a6ff', alpha=0.6)
     ax.axvline(x=pruning_idx, color='#f85149', linestyle='-', linewidth=1.5)
     ax.set_title(title, fontsize=10, loc='left', color='#e6edf3')
@@ -129,15 +128,9 @@ def get_event_heatmap(df, title):
         df_plot['sort_key'] = df_plot['Feature'].str.extract(r'([-]?\d+)').astype(int)
         df_plot = df_plot.sort_values('sort_key', ascending=False).drop(columns=['sort_key'])
     except: pass
-    
-    fig, ax = plt.subplots(figsize=(3, 5)) # Compact Size
-    sns.heatmap(df_plot.pivot_table(index='Feature', values='Shapley Value'), 
-                cmap='coolwarm', center=0, annot=True, fmt=".3f", 
-                ax=ax, cbar=False, annot_kws={"size": 8})
-    ax.set_title(title, fontsize=10, color='#e6edf3')
-    ax.set_ylabel("")
-    ax.tick_params(axis='y', colors='#8b949e', labelsize=8)
-    ax.set_xticks([])
+    fig, ax = plt.subplots(figsize=(3, 5))
+    sns.heatmap(df_plot.pivot_table(index='Feature', values='Shapley Value'), cmap='coolwarm', center=0, annot=True, fmt=".3f", ax=ax, cbar=False, annot_kws={"size": 8})
+    ax.set_title(title, fontsize=10, color='#e6edf3'); ax.set_ylabel(""); ax.tick_params(colors='#8b949e', labelsize=8); ax.set_xticks([])
     return fig
 
 def get_feature_bar(df, title):
@@ -145,32 +138,19 @@ def get_feature_bar(df, title):
     df_plot = df.copy()
     df_plot['abs_val'] = df_plot['Shapley Value'].abs()
     df_plot = df_plot.sort_values(by='abs_val', ascending=False).head(10)
-    
-    fig, ax = plt.subplots(figsize=(5, 4)) # Compact Size
-    fig.patch.set_facecolor('#0b0e11')
-    ax.set_facecolor('#0b0e11')
-    ax.spines['bottom'].set_color('#8b949e')
-    ax.spines['left'].set_color('#8b949e')
-    ax.tick_params(axis='both', colors='#8b949e', labelsize=8)
-
+    fig, ax = plt.subplots(figsize=(5, 4))
+    fig.patch.set_facecolor('#0b0e11'); ax.set_facecolor('#0b0e11')
+    ax.spines['bottom'].set_color('#8b949e'); ax.spines['left'].set_color('#8b949e')
+    ax.tick_params(colors='#8b949e', labelsize=8)
     sns.barplot(x='Shapley Value', y='Feature', data=df_plot, color='#58a6ff', ax=ax)
-    ax.axvline(x=0, color='gray', linewidth=0.8)
-    ax.set_title(title, fontsize=10, loc='left', color='#e6edf3')
-    ax.set_ylabel("")
+    ax.axvline(x=0, color='gray', linewidth=0.8); ax.set_title(title, fontsize=10, loc='left', color='#e6edf3'); ax.set_ylabel("")
     return fig
 
 def get_cell_heatmap(cell_df, title):
     if cell_df is None or cell_df.empty: return None
-    
-    fig, ax = plt.subplots(figsize=(6, 4)) # Compact Size
-    sns.heatmap(cell_df.pivot(index='Feature', columns='Event', values='Shapley Value'), 
-                cmap='coolwarm', center=0, annot=True, fmt=".3f", 
-                ax=ax, cbar=False, annot_kws={"size": 7})
-    ax.set_title(title, fontsize=10, color='#e6edf3')
-    ax.tick_params(axis='x', colors='#8b949e', labelsize=7, rotation=45)
-    ax.tick_params(axis='y', colors='#8b949e', labelsize=7)
-    ax.set_xlabel("")
-    ax.set_ylabel("")
+    fig, ax = plt.subplots(figsize=(6, 4))
+    sns.heatmap(cell_df.pivot(index='Feature', columns='Event', values='Shapley Value'), cmap='coolwarm', center=0, annot=True, fmt=".3f", ax=ax, cbar=False, annot_kws={"size": 7})
+    ax.set_title(title, fontsize=10, color='#e6edf3'); ax.tick_params(colors='#8b949e', labelsize=7); ax.set_xlabel(""); ax.set_ylabel("")
     return fig
 
 # ------------------------------------------------------------------------------
@@ -250,11 +230,12 @@ if menu == "📊 Market Forecast":
         input_tensor = torch.tensor(scaler.transform(input_raw)).float().unsqueeze(0)
         with torch.no_grad(): preds_scaled = model(input_tensor).numpy()[0]
         
+        # [Safe fix] Reshape for inverse_transform
         preds = []
         for p in preds_scaled:
             dummy = np.zeros(len(features))
             dummy[btc_idx] = p
-            preds.append(scaler.inverse_transform([dummy])[0][btc_idx])
+            preds.append(scaler.inverse_transform(dummy.reshape(1, -1))[0][btc_idx])
             
         future_dates = [pd.to_datetime(df['timestamp'].values[-1]) + pd.Timedelta(days=i) for i in range(1, 8)]
         fig = go.Figure()
@@ -314,7 +295,6 @@ elif menu == "🧠 Deep Insight (XAI)":
                 
                 global_feat = pd.concat(g_feats).groupby("Feature")["Shapley Value"].apply(lambda x: x.abs().mean()).reset_index()
                 
-                # Global Event Grouping Fix
                 evt_list = []
                 for df_evt in g_evts:
                     if 'Feature' not in df_evt.columns: 
@@ -361,7 +341,7 @@ elif menu == "🧠 Deep Insight (XAI)":
             
         def inv(p): 
             d = np.zeros(len(features)); d[btc_idx] = p
-            return scaler.inverse_transform([d])[0][btc_idx]
+            return scaler.inverse_transform(d.reshape(1, -1))[0][btc_idx]
             
         orig_real = [inv(p) for p in orig_p]
         mod_real = [inv(p) for p in mod_p]
@@ -407,7 +387,12 @@ elif menu == "⚡ Strategy Backtest":
                     with torch.no_grad():
                         p_seq = model(hist_tensor[i:idx].unsqueeze(0)).numpy()[0]
                     
-                    pred_prices = [scaler.inverse_transform(np.pad([p], (btc_idx, len(features)-btc_idx-1)))[0][btc_idx] for p in p_seq] # Simplified Inverse
+                    # [SAFE FIX] Replaced one-liner with loop and explicit reshape
+                    pred_prices = []
+                    for p in p_seq:
+                        d = np.zeros(len(features)); d[btc_idx] = p
+                        # reshape(1, -1) guarantees 2D array: (1, n_features)
+                        pred_prices.append(scaler.inverse_transform(d.reshape(1, -1))[0][btc_idx])
                     
                     avg_pred = np.mean(pred_prices)
                     cur_price = data.iloc[idx-1]['BTC_Close']
@@ -443,4 +428,3 @@ elif menu == "⚡ Strategy Backtest":
 
 st.markdown("---")
 st.markdown("<div style='text-align:center; color:#8b949e; font-size:12px;'>TOBIT v2.1 | Deep Learning Time Series Forecasting</div>", unsafe_allow_html=True)
-
