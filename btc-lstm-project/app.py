@@ -204,7 +204,6 @@ with st.sidebar:
     else: 
         st.markdown("## 🐻 **TOBIT**")
     
-    # [수정됨: 사용자의 목표를 반영한 직관적인 설명]
     st.markdown("### **TOBIT**")
     st.markdown("**AI 기반 비트코인 투자 분석 플랫폼**")
     st.caption("시계열 예측(Time-Series) 및 XAI 기법을 활용한 스마트 거래 전략")
@@ -380,6 +379,55 @@ elif menu == "🧠 Deep Insight (XAI)":
                 prompt = f"[Role] Crypto Analyst.\n[Scenario] {target} changes by {delta}%, Price changes by {diff:.2f}.\n[Task] Interpret sensitivity (Korean, 3 sentences)."
                 res = client.chat.completions.create(model="solar-pro2", messages=[{"role":"user","content":prompt}])
                 st.markdown(f"""<div class="ai-chat-box"><h4>🤖 Solar Pro 2 Insight</h4><p>{res.choices[0].message.content}</p></div>""", unsafe_allow_html=True)
+
+# [TAB 3] Model Specs (New!)
+elif menu == "📘 Model Specs":
+    st.markdown("#### 📘 Model Specifications & Architecture")
+    
+    st.info("본 플랫폼에서 사용하는 시계열 예측 모델들의 상세 스펙입니다.")
+    
+    # 3개 탭으로 나누어 설명
+    tab1, tab2, tab3 = st.tabs(["Transformer-based", "RNN/CNN-based", "Linear/MLP"])
+    
+    with tab1:
+        st.markdown("### 1. PatchTST (Patch Time Series Transformer)")
+        st.markdown("""
+        - **특징**: 시계열 데이터를 패치(Patch) 단위로 분할하여 트랜스포머에 입력하는 최신 모델.
+        - **장점**: 긴 시퀀스 데이터에서도 적은 연산량으로 높은 예측 성능을 보임.
+        - **구조**: Patching -> Transformer Encoder -> Flatten -> Linear Head
+        """)
+        
+        st.markdown("### 2. iTransformer")
+        st.markdown("""
+        - **특징**: 변수 간의 상관관계를 Attention 메커니즘으로 학습하는 역발상 트랜스포머.
+        - **장점**: 다변량 시계열 데이터(가격, 거래량, 온체인 데이터 등)의 상호작용 포착에 유리.
+        """)
+        
+    with tab2:
+        st.markdown("### 3. LSTM (Long Short-Term Memory)")
+        st.markdown("""
+        - **특징**: 바닐라 RNN의 장기 의존성(Long-term dependency) 문제를 해결한 모델.
+        - **장점**: 금융 시계열의 시간적 순서와 흐름을 잘 포착함.
+        """)
+        
+        st.markdown("### 4. TCN (Temporal Convolutional Network)")
+        st.markdown("""
+        - **특징**: 1D Convolution을 사용하여 시계열을 처리하는 CNN 기반 모델.
+        - **장점**: 병렬 처리가 가능하여 학습 속도가 빠르고, Receptive Field를 통해 긴 시간을 봄.
+        """)
+
+    with tab3:
+        st.markdown("### 5. DLinear")
+        st.markdown("""
+        - **특징**: 시계열을 추세(Trend)와 계절성(Seasonality)으로 분해하여 각각 선형 모델로 예측.
+        - **장점**: 단순하지만 매우 강력한 성능(State-of-the-Art급)을 보여주는 최신 베이스라인.
+        """)
+        
+        st.markdown("### 6. MLP (Multi-Layer Perceptron)")
+        st.markdown("""
+        - **특징**: 가장 기본적인 심층 신경망 구조.
+        - **장점**: 데이터의 비선형적 패턴을 단순하게 학습.
+        """)
 
 # [TAB 4] Backtest
 elif menu == "⚡ Strategy Backtest":
