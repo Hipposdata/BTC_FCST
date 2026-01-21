@@ -103,8 +103,12 @@ except Exception as e:
 try:
     from model import LSTMModel, DLinear, PatchTST, iTransformer, TCN, MLP
     from data_utils import fetch_multi_data, load_scaler, TICKERS
-except ImportError:
-    st.error("🚨 필수 파일(model.py, data_utils.py)이 누락되었습니다.")
+except ImportError as e:
+    # [수정] 이제 파일이 없다고 안 하고, 진짜 이유(e)를 말해줍니다.
+    st.error(f"🚨 필수 모듈 임포트 실패 (라이브러리 누락 가능성): {e}")
+    st.stop()
+except Exception as e:
+    st.error(f"🚨 알 수 없는 오류: {e}")
     st.stop()
 
 # ------------------------------------------------------------------------------
@@ -640,3 +644,4 @@ elif menu == "⚡ Strategy Backtest":
 
 st.markdown("---")
 st.markdown("<div style='text-align:center; color:#8b949e; font-size:12px;'>TOBIT v2.3 | AI-Driven Investment Analysis Platform</div>", unsafe_allow_html=True)
+
