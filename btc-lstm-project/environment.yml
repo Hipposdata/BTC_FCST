@@ -18,7 +18,7 @@ dependencies:
     - timeshap==1.0.4
     - openai==2.15.0
     - altair==4.2.2
-    - yfinance==0.2.66
+    - yfinance>=0.2.40
     - shap==0.41.0
     - graphviz
     - requests
