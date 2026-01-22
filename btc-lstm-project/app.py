@@ -16,7 +16,6 @@ import altair as alt
 
 # ==============================================================================
 # 0. [CRITICAL FIX] TimeSHAP Altair Theme Error Patch
-# Timeshap이 내부적으로 없는 테마를 호출하여 앱이 멈추는 것을 방지합니다.
 # ==============================================================================
 def placeholder_theme():
     return {"config": {}}
@@ -70,28 +69,24 @@ st.markdown("""
         border-radius: 10px; padding: 15px; margin-top: 15px;
         color: #e6edf3; font-size: 0.95rem; line-height: 1.5;
     }
-    /* Metric 스타일 조정 */
     [data-testid="stMetricLabel"] { font-size: 0.8rem; color: #8b949e; }
     [data-testid="stMetricValue"] { font-size: 1.1rem; color: #e6edf3; font-family: 'Roboto Mono', monospace; }
 </style>
 """, unsafe_allow_html=True)
 
 # ------------------------------------------------------------------------------
-# 2. API Key Setup (Secrets)
+# 2. API Key Setup
 # ------------------------------------------------------------------------------
 if "UPSTAGE_API_KEY" in st.secrets:
     UPSTAGE_API_KEY = st.secrets["UPSTAGE_API_KEY"]
 else:
-    # 로컬 테스트용 (배포 시 secrets.toml 필수)
     UPSTAGE_API_KEY = "YOUR_API_KEY_HERE" 
-    # st.error("🚨 API 키가 없습니다. .streamlit/secrets.toml 파일을 확인해주세요.")
-    # st.stop()
 
 BASE_URL = "https://api.upstage.ai/v1"
 client = OpenAI(api_key=UPSTAGE_API_KEY, base_url=BASE_URL)
 
 # ------------------------------------------------------------------------------
-# 3. Import Dependencies (Patch Applied)
+# 3. Import Dependencies
 # ------------------------------------------------------------------------------
 try:
     from timeshap.explainer import local_pruning, local_event, local_feat, local_cell_level
@@ -212,9 +207,12 @@ except: btc_idx = 0
 # 6. Sidebar & KPI
 # ------------------------------------------------------------------------------
 with st.sidebar:
-    logo_path = "assets/logo.png"
-    if os.path.exists(logo_path): st.image(logo_path, width=200)
-    else: st.markdown("## 🐻 **TOBIT**")
+    # [FIX] 로고 이미지 로딩 개선 (os.path 체크 대신 try-except 사용)
+    try:
+        st.image("assets/logo.png", width=200)
+    except:
+        st.markdown("## 🐻 **TOBIT**")
+        
     st.markdown("### **TOBIT**\n*From Data to Bitcoin*")
     st.markdown("---")
     menu = st.radio("MENU", ["📊 Market Forecast", "🧠 Deep Insight (XAI)", "📘 Model Specs", "⚡ Strategy Backtest"])
@@ -223,6 +221,7 @@ with st.sidebar:
     selected_seq_len = st.select_slider("Lookback Window", options=[14, 21, 45], value=14, format_func=lambda x: f"{x} Days")
     selected_model = st.selectbox("Target Model", MODELS_LIST, index=3)
     
+    # 시스템 상태 표시
     st.markdown(f"""
     <div style="background-color: #161b22; padding: 10px; border-radius: 8px; border: 1px solid #262a33; margin-top: 20px;">
         <div style="font-size: 11px; color: #8b949e;">SYSTEM STATUS</div>
@@ -238,7 +237,7 @@ with st.sidebar:
     """, unsafe_allow_html=True)
     
     # --------------------------------------------------------------------------
-    # [NEW] Discord Invite Link
+    # [ADD] Discord Invite Link (기존 요소 하단에 추가)
     # --------------------------------------------------------------------------
     st.markdown("---")
     st.markdown("<div style='text-align: center;'>", unsafe_allow_html=True)
@@ -248,8 +247,9 @@ with st.sidebar:
 if menu != "📘 Model Specs":
     c_logo, c_title = st.columns([0.08, 0.92])
     with c_logo: 
-        if os.path.exists("assets/logo.png"): st.image("assets/logo.png", width=50)
-        else: st.markdown("🐻")
+        # [FIX] 메인 로고 로딩 개선
+        try: st.image("assets/logo.png", width=50)
+        except: st.markdown("🐻")
     with c_title: st.markdown("<h2 style='margin-top: 5px;'>TOBIT Analysis Dashboard</h2>", unsafe_allow_html=True)
 
     last_row, prev_row = df.iloc[-1], df.iloc[-2]
@@ -282,9 +282,7 @@ if menu == "📊 Market Forecast":
             dummy[btc_idx] = p
             preds.append(scaler.inverse_transform([dummy])[0][btc_idx])
             
-        # ------------------------------------------------------------------
-        # [MODIFIED] X축 날짜 생성 및 그래프 색상 개선
-        # ------------------------------------------------------------------
+        # X축 날짜 생성 및 그래프 색상 개선
         if not pd.api.types.is_datetime64_any_dtype(df['timestamp']):
              df['timestamp'] = pd.to_datetime(df['timestamp'])
 
@@ -306,8 +304,8 @@ if menu == "📊 Market Forecast":
         
         # 2. Forecast Data (형광색)
         pred_color = '#FFA500' # 기본 오렌지
-        if preds[-1] > preds[0]: pred_color = '#00FF7F' # 상승: SpringGreen
-        else: pred_color = '#FF4500' # 하락: OrangeRed
+        if preds[-1] > preds[0]: pred_color = '#00FF7F' # 상승
+        else: pred_color = '#FF4500' # 하락
 
         fig.add_trace(go.Scatter(
             x=future_dates, 
@@ -334,9 +332,7 @@ if menu == "📊 Market Forecast":
         )
         st.plotly_chart(fig, use_container_width=True)
         
-        # ------------------------------------------------------------------
-        # [MODIFIED] 하단 7일 예측값 개별 표시
-        # ------------------------------------------------------------------
+        # 하단 7일 예측값 개별 표시
         st.markdown("###### 📅 7-Day Forecast Details")
         cols = st.columns(7)
         for i, (date, price) in enumerate(zip(future_dates, preds)):
@@ -399,7 +395,6 @@ elif menu == "🧠 Deep Insight (XAI)":
                 
                 global_feat = pd.concat(g_feats).groupby("Feature")["Shapley Value"].apply(lambda x: x.abs().mean()).reset_index()
                 
-                # Global Event Grouping Fix
                 evt_list = []
                 for df_evt in g_evts:
                     if 'Feature' not in df_evt.columns: 
