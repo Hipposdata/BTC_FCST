@@ -183,21 +183,18 @@ def get_model(name, seq_len):
     
     path = os.path.join(WEIGHTS_DIR, f"{name}_{seq_len}.pth")
     if os.path.exists(path):
-        try:
-            model.load_state_dict(torch.load(path, map_location='cpu'))
+        try: model.load_state_dict(torch.load(path, map_location='cpu'))
         except: pass
     model.eval()
     return model
 
 # ------------------------------------------------------------------------------
-# Data Loading with Cache (File-based)
+# Data Loading with Cache
 # ------------------------------------------------------------------------------
 DATA_CACHE_PATH = os.path.join(BASE_DIR, "daily_btc_data.csv")
 
 def get_data_with_cache():
     today_str = datetime.now().strftime("%Y-%m-%d")
-    
-    # 1. 파일이 있고, 오늘 날짜인지 확인
     if os.path.exists(DATA_CACHE_PATH):
         try:
             file_time = datetime.fromtimestamp(os.path.getmtime(DATA_CACHE_PATH)).strftime("%Y-%m-%d")
@@ -206,7 +203,6 @@ def get_data_with_cache():
                 if len(df) > 10: return df
         except: pass
 
-    # 2. 파일이 없거나 날짜가 지났으면 API 호출
     with st.spinner("🔄 최신 데이터를 서버에서 받아오는 중입니다... (하루 1회)"):
         try:
             new_df = fetch_multi_data()
@@ -237,8 +233,7 @@ with st.sidebar:
     try:
         if os.path.exists(LOGO_PATH):
             st.image(Image.open(LOGO_PATH), use_container_width=True)
-        else:
-            st.markdown("## 🐻 **TOBIT**")
+        else: st.markdown("## 🐻 **TOBIT**")
     except: st.markdown("## 🐻 **TOBIT**")
     
     st.markdown("### **TOBIT**\n*AI 기반 비트코인 투자 분석 플랫폼*")
@@ -263,7 +258,7 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
 
-    # [RESTORED] 디스코드 알람 로직
+    # 알람 및 초대 버튼
     st.markdown("---")
     if st.button("🔔 Send Report to Discord", use_container_width=True):
         with st.spinner("AI Analyzing Signal..."):
@@ -292,7 +287,6 @@ with st.sidebar:
                 else: st.error(f"전송 실패: {msg}")
             except Exception as e: st.error(f"오류: {e}")
             
-    # [RESTORED] 캡션 및 초대 버튼
     st.caption("ℹ️ 클릭 시 현재 시황과 AI 예측(7일 후)이 포함된 요약 리포트를 디스코드로 전송합니다.")
     st.link_button("👾 Join TOBIT Discord", "https://discord.gg/mQDsWnpx", use_container_width=True)
 
@@ -331,9 +325,9 @@ if menu == "📊 Market Forecast":
             dummy = np.zeros(len(features)); dummy[btc_idx] = p
             preds.append(scaler.inverse_transform(dummy.reshape(1, -1))[0][btc_idx])
             
-        future_dates = [pd.to_datetime(df.index[-1]) + pd.Timedelta(days=i) for i in range(1, 8)]
+        future_dates = [pd.to_datetime(df['timestamp'].values[-1]) + pd.Timedelta(days=i) for i in range(1, 8)]
         fig = go.Figure()
-        fig.add_trace(go.Scatter(x=df.index[-90:], y=df['BTC_Close'].tail(90), name="Historical", mode='lines', line=dict(color='rgba(139, 148, 158, 0.5)', width=2), fill='tozeroy', fillcolor='rgba(139, 148, 158, 0.1)'))
+        fig.add_trace(go.Scatter(x=df['timestamp'].tail(90), y=df['BTC_Close'].tail(90), name="Historical", mode='lines', line=dict(color='rgba(139, 148, 158, 0.5)', width=2), fill='tozeroy', fillcolor='rgba(139, 148, 158, 0.1)'))
         pred_color = '#3fb950' if preds[-1] > preds[0] else '#f85149'
         fig.add_trace(go.Scatter(x=future_dates, y=preds, name=f"TOBIT Forecast", mode='lines+markers', line=dict(color=pred_color, width=3), marker=dict(size=6, color='#161b22', line=dict(width=2, color=pred_color))))
         fig.update_layout(template='plotly_dark', paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=350, xaxis=dict(showgrid=False), yaxis=dict(showgrid=True, gridcolor='#262a33'), hovermode="x unified", margin=dict(l=20, r=20, t=30, b=20))
@@ -341,7 +335,7 @@ if menu == "📊 Market Forecast":
         st.markdown(f"""<div style="padding: 15px; border-left: 3px solid {pred_color}; background-color: #161b22;"><span style="color: #8b949e; font-size: 13px;">TOBIT Analysis Summary:</span><br><span style="font-size: 16px; font-weight: bold; color: #e6edf3;">Target Price (7D): ${preds[-1]:,.0f}</span></div>""", unsafe_allow_html=True)
     else: st.warning("Model weights not found.")
 
-# [TAB 2] Deep Insight
+# [TAB 2] Deep Insight (XAI)
 elif menu == "🧠 Deep Insight (XAI)":
     st.markdown(f"#### 🧠 Deep Explainable AI: {selected_model}")
     model = get_model(selected_model, selected_seq_len)
@@ -383,17 +377,53 @@ elif menu == "🧠 Deep Insight (XAI)":
                     s_in = X_all[i:i+selected_seq_len].reshape(1, selected_seq_len, -1)
                     g_feats.append(local_feat(f_hs, s_in, {'rs':42, 'nsamples':100, 'feature_names': features}, None, None, average_event, 0))
                     g_evts.append(local_event(f_hs, s_in, {'rs':42, 'nsamples':100}, None, None, average_event, 0))
-                
                 global_feat = pd.concat(g_feats).groupby("Feature")["Shapley Value"].apply(lambda x: x.abs().mean()).reset_index()
                 evt_list = []
                 for df_evt in g_evts:
                     if 'Feature' not in df_evt.columns: df_evt = df_evt.reset_index(); df_evt.columns = ['Feature', 'Shapley Value']
                     evt_list.append(df_evt)
                 global_evt = pd.concat(evt_list).groupby("Feature")["Shapley Value"].apply(lambda x: x.abs().mean()).reset_index()
-                
                 c1, c2 = st.columns(2)
                 with c1: st.pyplot(get_feature_bar(global_feat, "4. Global Feature"), use_container_width=True)
                 with c2: st.pyplot(get_event_heatmap(global_evt, "5. Global Event"), use_container_width=True)
+
+        # [AI ANALYST 1: TimeSHAP]
+        if st.button("✨ Ask AI Analyst (TimeSHAP)"):
+            with st.spinner("AI analyzing..."):
+                try:
+                    feat_df = st.session_state.get(f'l_feat_{pruning_tol}')
+                    evt_df = st.session_state.get(cache_key)
+                    
+                    feat_txt = "\n".join([f"- {r.Feature}: {r['Shapley Value']:.4f}" for _, r in feat_df.head(3).iterrows()]) if feat_df is not None else "N/A"
+                    evt_txt = "N/A"
+                    if evt_df is not None:
+                        if 'Feature' in evt_df.columns: evt_df = evt_df.set_index('Feature')
+                        evt_txt = "\n".join([f"- Time Step {i}: {r['Shapley Value']:.4f}" for i, r in evt_df.head(3).iterrows()])
+                        
+                    prompt = f"""[Role]
+                    Professional Crypto Derivatives Analyst & XAI Specialist.
+
+                    [Context]
+                    We are analyzing a Bitcoin price prediction model.
+                    The model predicts the price 7 days from now.
+
+                    [XAI Analysis Data - TimeSHAP]
+                    1. Most Important Features (Key Drivers):
+                    {feat_txt}
+
+                    2. Most Significant Past Events (Time Steps):
+                    {evt_txt}
+
+                    [Task]
+                    Synthesize the above data to provide a comprehensive market analysis.
+                    - Explain which features are driving the price the most.
+                    - Interpret why specific past time steps (events) are significant.
+                    - Provide a strategic insight based on this interpretability data.
+                    - Answer in Korean, professional tone, within 5 sentences."""
+                    
+                    res = client.chat.completions.create(model="solar-pro2", messages=[{"role":"user","content":prompt}])
+                    st.markdown(f"""<div class="ai-chat-box"><h4>🤖 Solar Pro 2 Insight</h4><p>{res.choices[0].message.content}</p></div>""", unsafe_allow_html=True)
+                except Exception as e: st.error(str(e))
 
         st.markdown("---")
         st.markdown("### 2️⃣ Counterfactual Simulator")
@@ -422,9 +452,25 @@ elif menu == "🧠 Deep Insight (XAI)":
         fig_cf.update_layout(template='plotly_dark', paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=350, margin=dict(l=20, r=20, t=30, b=20))
         st.plotly_chart(fig_cf, use_container_width=True)
 
+        # [AI ANALYST 2: Simulation]
         if st.button("✨ Ask AI Analyst (Simulation)"):
             with st.spinner("AI analyzing..."):
-                prompt = f"[Role] Crypto Analyst.\n[Scenario] {target} changes by {delta}%, Price changes by {diff:.2f}.\n[Task] Interpret sensitivity (Korean, 3 sentences)."
+                prompt = f"""[Role]
+                Crypto Risk Management Consultant.
+
+                [Scenario - What-If Analysis]
+                The user is simulating a market scenario.
+                - Target Feature: {target}
+                - Adjusted Change: {delta}%
+                - Resulting 7-Day Forecast Change: {diff:+.2f} USD
+
+                [Task]
+                Analyze the sensitivity of the Bitcoin price to this specific feature.
+                - Is the model highly sensitive or resilient to changes in {target}?
+                - What does this imply for market volatility regarding this feature?
+                - Provide a brief risk management tip.
+                - Answer in Korean, concise and insightful."""
+                
                 res = client.chat.completions.create(model="solar-pro2", messages=[{"role":"user","content":prompt}])
                 st.markdown(f"""<div class="ai-chat-box"><h4>🤖 Solar Pro 2 Insight</h4><p>{res.choices[0].message.content}</p></div>""", unsafe_allow_html=True)
 
