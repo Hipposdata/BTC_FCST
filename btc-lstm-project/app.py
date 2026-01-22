@@ -295,7 +295,7 @@ with st.sidebar:
             send_discord_alert(msg)
     
     # [NEW] 버튼 설명 문구 추가
-    st.caption("ℹ️ 클릭 시 현재 시황과 AI 예측가이 포함된 요약 리포트를 디스코드로 전송합니다.")
+    st.caption("ℹ️ 클릭 시 현재 시황과 AI 예측이 포함된 요약 리포트를 디스코드로 전송합니다.")
             
     st.link_button("👾 Join TOBIT Discord", "https://discord.gg/mQDsWnpx", use_container_width=True)
 
@@ -510,4 +510,5 @@ elif menu == "⚡ Strategy Backtest":
 
 st.markdown("---")
 st.markdown("<div style='text-align:center; color:#8b949e; font-size:12px;'>TOBIT v2.1 | Deep Learning Time Series Forecasting</div>", unsafe_allow_html=True)
+
 
