@@ -5,6 +5,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import plotly.express as px
 import os
+import requests # [NEW] 디스코드 알람 전송을 위해 추가
 import inspect
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -29,7 +30,7 @@ if "feedzai" not in alt.themes.names():
 # ------------------------------------------------------------------------------
 st.set_page_config(
     page_title="TOBIT | From Data to Bitcoin",
-    page_icon="assets/logo.png",  # 로고 파일 경로
+    page_icon="assets/logo.png",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -77,10 +78,16 @@ st.markdown("""
 # ------------------------------------------------------------------------------
 # 2. API Key Setup
 # ------------------------------------------------------------------------------
+# [설정] 디스코드 웹훅 URL (여기에 본인의 웹훅 주소를 넣으세요)
+# 예: "https://discord.com/api/webhooks/..."
+DISCORD_WEBHOOK_URL = "" 
+
 if "UPSTAGE_API_KEY" in st.secrets:
     UPSTAGE_API_KEY = st.secrets["UPSTAGE_API_KEY"]
+    if "DISCORD_WEBHOOK_URL" in st.secrets:
+        DISCORD_WEBHOOK_URL = st.secrets["DISCORD_WEBHOOK_URL"]
 else:
-    UPSTAGE_API_KEY = "YOUR_API_KEY_HERE" 
+    UPSTAGE_API_KEY = "YOUR_API_KEY_HERE"
 
 BASE_URL = "https://api.upstage.ai/v1"
 client = OpenAI(api_key=UPSTAGE_API_KEY, base_url=BASE_URL)
@@ -104,6 +111,22 @@ except ImportError:
 # ------------------------------------------------------------------------------
 # 4. Helper Functions
 # ------------------------------------------------------------------------------
+def send_discord_alert(message):
+    """디스코드 웹훅으로 메시지 전송"""
+    if not DISCORD_WEBHOOK_URL:
+        st.sidebar.error("🚨 Webhook URL 미설정")
+        return
+    
+    data = {"content": message}
+    try:
+        response = requests.post(DISCORD_WEBHOOK_URL, json=data)
+        if response.status_code == 204:
+            st.sidebar.success("✅ 알람 전송 완료!")
+        else:
+            st.sidebar.error(f"전송 실패: {response.status_code}")
+    except Exception as e:
+        st.sidebar.error(f"에러 발생: {e}")
+
 def get_pruning_plot(plot_data, pruning_idx, title="Pruning Plot"):
     if plot_data is None: return None
     df_plot = pd.DataFrame([{'Index': item[1], 'Value': item[2]} for item in plot_data]) if isinstance(plot_data, list) else plot_data.copy()
@@ -207,10 +230,12 @@ except: btc_idx = 0
 # 6. Sidebar & KPI
 # ------------------------------------------------------------------------------
 with st.sidebar:
-    # [FIX] 로고 이미지 로딩 개선 (os.path 체크 대신 try-except 사용)
-    try:
-        st.image("assets/logo.png", width=200)
-    except:
+    # --------------------------------------------------------------------------
+    # [FIX] 로고 이미지 (try-except 없이 직접 로딩 + 너비 채움)
+    # --------------------------------------------------------------------------
+    if os.path.exists("assets/logo.png"):
+        st.image("assets/logo.png", use_container_width=True) # width=200 대신 use_container_width 사용
+    else:
         st.markdown("## 🐻 **TOBIT**")
         
     st.markdown("### **TOBIT**\n*From Data to Bitcoin*")
@@ -237,21 +262,20 @@ with st.sidebar:
     """, unsafe_allow_html=True)
     
     # --------------------------------------------------------------------------
-    # [ADD] Discord Invite Link (기존 요소 하단에 추가)
+    # [RESTORE] Discord Alarm Button (Webhook Trigger)
     # --------------------------------------------------------------------------
     st.markdown("---")
-    st.markdown("<div style='text-align: center;'>", unsafe_allow_html=True)
-    st.link_button("👾 Join TOBIT Discord", "https://discord.gg/mQDsWnpx", use_container_width=True)
-    st.markdown("</div>", unsafe_allow_html=True)
+    if st.button("🔔 Send Discord Alarm", use_container_width=True):
+        # 현재 비트코인 가격 정보를 담아서 알림 전송
+        current_price = df.iloc[-1]['BTC_Close']
+        msg = f"📢 **[TOBIT Alert]**\n현재 비트코인 가격: ${current_price:,.0f}\n모델 {selected_model} 모니터링 중입니다."
+        send_discord_alert(msg)
 
 if menu != "📘 Model Specs":
-    c_logo, c_title = st.columns([0.08, 0.92])
-    with c_logo: 
-        # [FIX] 메인 로고 로딩 개선
-        try: st.image("assets/logo.png", width=50)
-        except: st.markdown("🐻")
-    with c_title: st.markdown("<h2 style='margin-top: 5px;'>TOBIT Analysis Dashboard</h2>", unsafe_allow_html=True)
-
+    # 로고가 사이드바에 있으므로 메인 화면 로고는 생략하거나 작게 표시
+    # st.markdown("<h2 style='margin-top: 5px;'>TOBIT Analysis Dashboard</h2>", unsafe_allow_html=True)
+    
+    # 헤더 대신 바로 KPI 표시 (스크린샷 느낌대로)
     last_row, prev_row = df.iloc[-1], df.iloc[-2]
     price_diff = last_row['BTC_Close'] - prev_row['BTC_Close']
     def kpi(label, val, delta, color): return f"""<div class="kpi-card"><div class="kpi-label">{label}</div><div class="kpi-value">{val}</div><div class="kpi-delta {color}">{delta}</div></div>"""
@@ -282,7 +306,6 @@ if menu == "📊 Market Forecast":
             dummy[btc_idx] = p
             preds.append(scaler.inverse_transform([dummy])[0][btc_idx])
             
-        # X축 날짜 생성 및 그래프 색상 개선
         if not pd.api.types.is_datetime64_any_dtype(df['timestamp']):
              df['timestamp'] = pd.to_datetime(df['timestamp'])
 
