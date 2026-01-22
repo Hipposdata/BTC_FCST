@@ -16,7 +16,7 @@ from openai import OpenAI
 import altair as alt  
 
 # ==============================================================================
-# 0. Theme Patch (Altair 오류 방지)
+# 0. Theme Patch
 # ==============================================================================
 def placeholder_theme():
     return {"config": {}}
@@ -26,9 +26,8 @@ if "feedzai" not in alt.themes.names():
     alt.themes.enable("feedzai")
 
 # ------------------------------------------------------------------------------
-# 1. Path & Page Config (동적 경로 설정)
+# 1. Path & Page Config
 # ------------------------------------------------------------------------------
-# 현재 파일(app.py)의 절대 경로를 기준으로 리소스를 찾습니다.
 current_dir = os.path.dirname(os.path.abspath(__file__))
 logo_path = os.path.join(current_dir, "assets", "logo.png")
 weights_dir = os.path.join(current_dir, "weights")
@@ -112,11 +111,9 @@ except ImportError:
     st.error("model.py 또는 data_utils.py 파일이 누락되었습니다.")
 
 def send_discord_alert(message):
-    """디스코드 웹훅 전송 함수"""
     if not DISCORD_WEBHOOK_URL:
         st.sidebar.error("🚨 Webhook URL 미설정 (secrets.toml 확인)")
         return
-    
     data = {"content": message}
     try:
         response = requests.post(DISCORD_WEBHOOK_URL, json=data)
@@ -192,9 +189,8 @@ def get_cell_heatmap(cell_df, title):
     return fig
 
 # ------------------------------------------------------------------------------
-# 4. Data Loading (with Caching)
+# 4. Data Loading (Caching)
 # ------------------------------------------------------------------------------
-# API 중복 호출을 방지하기 위해 캐싱을 사용합니다. (ttl=3600초 = 1시간)
 @st.cache_data(ttl=3600)
 def load_all_data():
     s = load_scaler()
@@ -220,7 +216,6 @@ def get_model(name, seq_len):
     elif name == "PatchTST": model = PatchTST(input_size=input_size, seq_len=seq_len, pred_len=pred_len, patch_len=7, stride=3, d_model=64, n_heads=4, n_layers=2, dropout=0.2)
     elif name == "iTransformer": model = iTransformer(seq_len=seq_len, pred_len=pred_len, input_size=input_size, d_model=256, n_heads=4, n_layers=3, dropout=0.2)
     
-    # weights_dir 변수 사용 (상단에서 설정됨)
     path = os.path.join(weights_dir, f"{name}_{seq_len}.pth")
     if os.path.exists(path):
         try: model.load_state_dict(torch.load(path, map_location='cpu', weights_only=True))
@@ -236,7 +231,6 @@ except: btc_idx = 0
 # 6. Sidebar & KPI
 # ------------------------------------------------------------------------------
 with st.sidebar:
-    # [FIX] 로고 경로 자동 인식
     if os.path.exists(logo_path):
         st.image(logo_path, use_container_width=True)
     else:
@@ -264,37 +258,24 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
     
-    # [NEW] 알람 및 초대 버튼 + 설명
     st.markdown("---")
-    
-    # 1. 알람 버튼 (예측값 계산 후 전송)
     if st.button("🔔 Send Discord Alarm", use_container_width=True):
         with st.spinner("Analyzing & Sending..."):
-            # A. 현재 데이터 수집
             curr_price = df.iloc[-1]['BTC_Close']
             curr_sentiment = df.iloc[-1]['Fear_Greed_Index']
             sentiment_str = "Greed" if curr_sentiment > 60 else "Fear" if curr_sentiment < 40 else "Neutral"
-            
-            # B. 예측값 계산 (버튼 클릭 시 즉시 추론)
             alert_model = get_model(selected_model, selected_seq_len)
             alert_pred_price = 0
             trend_emoji = "➡️"
-            
             if alert_model:
                 inp = df[features].tail(selected_seq_len).values
                 inp_ts = torch.tensor(scaler.transform(inp)).float().unsqueeze(0)
-                with torch.no_grad(): 
-                    out = alert_model(inp_ts).numpy()[0]
-                
-                # 역변환 (마지막 7일차 가격)
+                with torch.no_grad(): out = alert_model(inp_ts).numpy()[0]
                 dummy = np.zeros(len(features))
                 dummy[btc_idx] = out[-1]
                 alert_pred_price = scaler.inverse_transform([dummy])[0][btc_idx]
-                
                 if alert_pred_price > curr_price: trend_emoji = "📈 상승 (Bullish)"
                 else: trend_emoji = "📉 하락 (Bearish)"
-
-            # C. 메시지 구성
             msg = (
                 f"📢 **[TOBIT AI Alert]**\n"
                 f"━━━━━━━━━━━━━━━━━━\n"
@@ -308,15 +289,10 @@ with st.sidebar:
                 f"Please check the dashboard for details."
             )
             send_discord_alert(msg)
-    
     st.caption("ℹ️ 클릭 시 현재 시황과 AI 예측(7일 후)이 포함된 요약 리포트를 디스코드로 전송합니다.")
-    
-    # 2. 초대 버튼
     st.link_button("👾 Join TOBIT Discord", "https://discord.gg/mQDsWnpx", use_container_width=True)
 
-
 if menu != "📘 Model Specs":
-    # 메인 KPI 섹션
     last_row, prev_row = df.iloc[-1], df.iloc[-2]
     price_diff = last_row['BTC_Close'] - prev_row['BTC_Close']
     def kpi(label, val, delta, color): return f"""<div class="kpi-card"><div class="kpi-label">{label}</div><div class="kpi-value">{val}</div><div class="kpi-delta {color}">{delta}</div></div>"""
@@ -354,56 +330,22 @@ if menu == "📊 Market Forecast":
         future_dates = [last_date + pd.Timedelta(days=i) for i in range(1, 8)]
         
         fig = go.Figure()
+        fig.add_trace(go.Scatter(x=df['timestamp'].tail(90), y=df['BTC_Close'].tail(90), name="Historical", mode='lines', line=dict(color='rgba(200, 200, 200, 0.4)', width=2), fill='tozeroy', fillcolor='rgba(200, 200, 200, 0.05)'))
+        pred_color = '#FFA500' # 오렌지
+        if preds[-1] > preds[0]: pred_color = '#00FF7F' # 상승
+        else: pred_color = '#FF4500' # 하락
+        fig.add_trace(go.Scatter(x=future_dates, y=preds, name=f"TOBIT Forecast", mode='lines+markers', line=dict(color=pred_color, width=4), marker=dict(size=8, color=pred_color, line=dict(width=1, color='white'))))
         
-        # 1. Historical Data (회색)
-        fig.add_trace(go.Scatter(
-            x=df['timestamp'].tail(90), 
-            y=df['BTC_Close'].tail(90), 
-            name="Historical", 
-            mode='lines', 
-            line=dict(color='rgba(200, 200, 200, 0.4)', width=2),
-            fill='tozeroy', 
-            fillcolor='rgba(200, 200, 200, 0.05)'
-        ))
-        
-        # 2. Forecast Data (형광색)
-        pred_color = '#FFA500' # 기본 오렌지
-        if preds[-1] > preds[0]: pred_color = '#00FF7F' # 상승: SpringGreen
-        else: pred_color = '#FF4500' # 하락: OrangeRed
-
-        fig.add_trace(go.Scatter(
-            x=future_dates, 
-            y=preds, 
-            name=f"TOBIT Forecast", 
-            mode='lines+markers', 
-            line=dict(color=pred_color, width=4),
-            marker=dict(size=8, color=pred_color, line=dict(width=1, color='white'))
-        ))
-        
-        fig.update_layout(
-            template='plotly_dark', 
-            paper_bgcolor='rgba(0,0,0,0)', 
-            plot_bgcolor='rgba(0,0,0,0)', 
-            height=350, 
-            xaxis=dict(showgrid=False, type='date', tickformat='%m/%d'), 
-            yaxis=dict(showgrid=True, gridcolor='#262a33'), 
-            hovermode="x unified", 
-            margin=dict(l=20, r=20, t=30, b=20)
-        )
+        fig.update_layout(template='plotly_dark', paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=350, xaxis=dict(showgrid=False, type='date', tickformat='%m/%d'), yaxis=dict(showgrid=True, gridcolor='#262a33'), hovermode="x unified", margin=dict(l=20, r=20, t=30, b=20))
         st.plotly_chart(fig, use_container_width=True)
         
-        # 하단 7일 예측값 개별 표시
         st.markdown("###### 📅 7-Day Forecast Details")
         cols = st.columns(7)
         for i, (date, price) in enumerate(zip(future_dates, preds)):
             with cols[i]:
                 prev_price = preds[i-1] if i > 0 else df['BTC_Close'].iloc[-1]
                 diff = price - prev_price
-                st.metric(
-                    label=date.strftime("%m/%d (%a)"), 
-                    value=f"${price:,.0f}", 
-                    delta=f"{diff:+.0f}"
-                )
+                st.metric(label=date.strftime("%m/%d (%a)"), value=f"${price:,.0f}", delta=f"{diff:+.0f}")
         st.markdown("---")
     else: st.warning("Model weights not found.")
 
@@ -450,7 +392,6 @@ elif menu == "🧠 Deep Insight (XAI)":
                     s_in = X_all[i:i+selected_seq_len].reshape(1, selected_seq_len, -1)
                     g_feats.append(local_feat(f_hs, s_in, {'rs':42, 'nsamples':100, 'feature_names': features}, None, None, average_event, 0))
                     g_evts.append(local_event(f_hs, s_in, {'rs':42, 'nsamples':100}, None, None, average_event, 0))
-                
                 global_feat = pd.concat(g_feats).groupby("Feature")["Shapley Value"].apply(lambda x: x.abs().mean()).reset_index()
                 evt_list = []
                 for df_evt in g_evts:
@@ -508,6 +449,31 @@ elif menu == "🧠 Deep Insight (XAI)":
                 res = client.chat.completions.create(model="solar-pro2", messages=[{"role":"user","content":prompt}])
                 st.markdown(f"""<div class="ai-chat-box"><h4>🤖 Solar Pro 2 Insight</h4><p>{res.choices[0].message.content}</p></div>""", unsafe_allow_html=True)
 
+# [TAB 3] Model Specs (복구됨)
+elif menu == "📘 Model Specs":
+    st.markdown("#### 📘 Model Architecture & Specifications")
+    spec_model = st.selectbox("Select Model to Inspect", MODELS_LIST)
+    
+    c1, c2 = st.columns([1, 1.5])
+    with c1:
+        st.info(f"**{spec_model}** Architecture Details")
+        st.markdown(f"""
+        - **Input Sequence:** {selected_seq_len} Days
+        - **Forecast Horizon:** 7 Days
+        - **Features:** {len(features)} (Open, High, Low, Close, Vol, etc.)
+        """)
+    with c2:
+        st.markdown("##### 📜 Source Code")
+        try:
+            model_class = MODEL_CLASSES[spec_model]
+            source_code = inspect.getsource(model_class)
+            st.code(source_code, language='python')
+        except Exception as e:
+            st.error(f"Cannot retrieve source code: {e}")
+
+    st.markdown("---")
+    st.caption("ℹ️ This section provides transparency into the model architectures used for forecasting.")
+
 # [TAB 4] Backtest
 elif menu == "⚡ Strategy Backtest":
     st.markdown("#### 🧪 Backtest Simulation")
@@ -527,8 +493,13 @@ elif menu == "⚡ Strategy Backtest":
                 res, port_hist, bh_hist = [], [], []
                 for i in range(window):
                     idx = i + selected_seq_len
-                    with torch.no_grad(): p_seq = model(hist_tensor[i:idx].unsqueeze(0)).numpy()[0]
-                    pred_prices = [scaler.inverse_transform(np.pad([p], (btc_idx, len(features)-btc_idx-1)))[0][btc_idx] for p in p_seq]
+                    with torch.no_grad():
+                        p_seq = model(hist_tensor[i:idx].unsqueeze(0)).numpy()[0]
+                    pred_prices = []
+                    for p in p_seq:
+                        dummy = np.zeros(len(features))
+                        dummy[btc_idx] = p
+                        pred_prices.append(scaler.inverse_transform([dummy])[0][btc_idx])
                     avg_pred = np.mean(pred_prices)
                     cur_price = data.iloc[idx-1]['BTC_Close']
                     ret_pct = ((avg_pred - cur_price) / cur_price) * 100
