@@ -5,7 +5,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import plotly.express as px
 import os
-import requests # [NEW] 디스코드 알람 전송을 위해 추가
+import requests 
 import inspect
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -16,7 +16,7 @@ from openai import OpenAI
 import altair as alt  
 
 # ==============================================================================
-# 0. [CRITICAL FIX] TimeSHAP Altair Theme Error Patch
+# 0. Theme Patch
 # ==============================================================================
 def placeholder_theme():
     return {"config": {}}
@@ -26,11 +26,15 @@ if "feedzai" not in alt.themes.names():
     alt.themes.enable("feedzai")
 
 # ------------------------------------------------------------------------------
-# 1. Page Config & TOBIT Theme CSS
+# 1. Path & Page Config (로고 경로 자동 설정)
 # ------------------------------------------------------------------------------
+# [FIX] 현재 실행 중인 파일(app.py)의 위치를 기준으로 assets 폴더 경로를 찾습니다.
+current_dir = os.path.dirname(os.path.abspath(__file__))
+logo_path = os.path.join(current_dir, "assets", "logo.png")
+
 st.set_page_config(
     page_title="TOBIT | From Data to Bitcoin",
-    page_icon="assets/logo.png",
+    page_icon=logo_path if os.path.exists(logo_path) else "🐻",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -76,10 +80,8 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ------------------------------------------------------------------------------
-# 2. API Key Setup
+# 2. API Key & Webhook Setup
 # ------------------------------------------------------------------------------
-# [설정] 디스코드 웹훅 URL (여기에 본인의 웹훅 주소를 넣으세요)
-# 예: "https://discord.com/api/webhooks/..."
 DISCORD_WEBHOOK_URL = "" 
 
 if "UPSTAGE_API_KEY" in st.secrets:
@@ -93,7 +95,7 @@ BASE_URL = "https://api.upstage.ai/v1"
 client = OpenAI(api_key=UPSTAGE_API_KEY, base_url=BASE_URL)
 
 # ------------------------------------------------------------------------------
-# 3. Import Dependencies
+# 3. Dependencies & Utils
 # ------------------------------------------------------------------------------
 try:
     from timeshap.explainer import local_pruning, local_event, local_feat, local_cell_level
@@ -108,13 +110,10 @@ try:
 except ImportError:
     st.error("model.py 또는 data_utils.py 파일이 누락되었습니다.")
 
-# ------------------------------------------------------------------------------
-# 4. Helper Functions
-# ------------------------------------------------------------------------------
 def send_discord_alert(message):
-    """디스코드 웹훅으로 메시지 전송"""
+    """디스코드 웹훅 전송 함수"""
     if not DISCORD_WEBHOOK_URL:
-        st.sidebar.error("🚨 Webhook URL 미설정")
+        st.sidebar.error("🚨 Webhook URL 미설정 (secrets.toml 확인)")
         return
     
     data = {"content": message}
@@ -127,17 +126,16 @@ def send_discord_alert(message):
     except Exception as e:
         st.sidebar.error(f"에러 발생: {e}")
 
+# 시각화 헬퍼 함수들
 def get_pruning_plot(plot_data, pruning_idx, title="Pruning Plot"):
     if plot_data is None: return None
     df_plot = pd.DataFrame([{'Index': item[1], 'Value': item[2]} for item in plot_data]) if isinstance(plot_data, list) else plot_data.copy()
-    
     fig, ax = plt.subplots(figsize=(6, 2.5))
     fig.patch.set_facecolor('#0b0e11')
     ax.set_facecolor('#0b0e11')
     ax.spines['bottom'].set_color('#8b949e')
     ax.spines['left'].set_color('#8b949e')
     ax.tick_params(axis='both', colors='#8b949e', labelsize=8)
-    
     ax.fill_between(df_plot.iloc[:, 1], df_plot.iloc[:, 2], color='#58a6ff', alpha=0.6)
     ax.axvline(x=pruning_idx, color='#f85149', linestyle='-', linewidth=1.5)
     ax.set_title(title, fontsize=10, loc='left', color='#e6edf3')
@@ -152,7 +150,6 @@ def get_event_heatmap(df, title):
         df_plot['sort_key'] = df_plot['Feature'].str.extract(r'([-]?\d+)').astype(int)
         df_plot = df_plot.sort_values('sort_key', ascending=False).drop(columns=['sort_key'])
     except: pass
-    
     fig, ax = plt.subplots(figsize=(3, 5))
     sns.heatmap(df_plot.pivot_table(index='Feature', values='Shapley Value'), 
                 cmap='coolwarm', center=0, annot=True, fmt=".3f", 
@@ -168,14 +165,12 @@ def get_feature_bar(df, title):
     df_plot = df.copy()
     df_plot['abs_val'] = df_plot['Shapley Value'].abs()
     df_plot = df_plot.sort_values(by='abs_val', ascending=False).head(10)
-    
     fig, ax = plt.subplots(figsize=(5, 4))
     fig.patch.set_facecolor('#0b0e11')
     ax.set_facecolor('#0b0e11')
     ax.spines['bottom'].set_color('#8b949e')
     ax.spines['left'].set_color('#8b949e')
     ax.tick_params(axis='both', colors='#8b949e', labelsize=8)
-
     sns.barplot(x='Shapley Value', y='Feature', data=df_plot, color='#58a6ff', ax=ax)
     ax.axvline(x=0, color='gray', linewidth=0.8)
     ax.set_title(title, fontsize=10, loc='left', color='#e6edf3')
@@ -184,7 +179,6 @@ def get_feature_bar(df, title):
 
 def get_cell_heatmap(cell_df, title):
     if cell_df is None or cell_df.empty: return None
-    
     fig, ax = plt.subplots(figsize=(6, 4))
     sns.heatmap(cell_df.pivot(index='Feature', columns='Event', values='Shapley Value'), 
                 cmap='coolwarm', center=0, annot=True, fmt=".3f", 
@@ -199,7 +193,7 @@ def get_cell_heatmap(cell_df, title):
 # ------------------------------------------------------------------------------
 # 5. Model Logic
 # ------------------------------------------------------------------------------
-WEIGHTS_DIR = 'weights'
+WEIGHTS_DIR = os.path.join(current_dir, 'weights') # 가중치 경로도 절대경로로 수정
 MODELS_LIST = ["MLP", "DLinear", "TCN", "LSTM", "PatchTST", "iTransformer"]
 MODEL_CLASSES = {"MLP": MLP, "DLinear": DLinear, "TCN": TCN, "LSTM": LSTMModel, "PatchTST": PatchTST, "iTransformer": iTransformer}
 
@@ -231,10 +225,10 @@ except: btc_idx = 0
 # ------------------------------------------------------------------------------
 with st.sidebar:
     # --------------------------------------------------------------------------
-    # [FIX] 로고 이미지 (try-except 없이 직접 로딩 + 너비 채움)
+    # [FIX] 로고 경로 자동 인식
     # --------------------------------------------------------------------------
-    if os.path.exists("assets/logo.png"):
-        st.image("assets/logo.png", use_container_width=True) # width=200 대신 use_container_width 사용
+    if os.path.exists(logo_path):
+        st.image(logo_path, use_container_width=True)
     else:
         st.markdown("## 🐻 **TOBIT**")
         
@@ -246,7 +240,6 @@ with st.sidebar:
     selected_seq_len = st.select_slider("Lookback Window", options=[14, 21, 45], value=14, format_func=lambda x: f"{x} Days")
     selected_model = st.selectbox("Target Model", MODELS_LIST, index=3)
     
-    # 시스템 상태 표시
     st.markdown(f"""
     <div style="background-color: #161b22; padding: 10px; border-radius: 8px; border: 1px solid #262a33; margin-top: 20px;">
         <div style="font-size: 11px; color: #8b949e;">SYSTEM STATUS</div>
@@ -262,20 +255,58 @@ with st.sidebar:
     """, unsafe_allow_html=True)
     
     # --------------------------------------------------------------------------
-    # [RESTORE] Discord Alarm Button (Webhook Trigger)
+    # [NEW] 알람 및 초대 버튼
     # --------------------------------------------------------------------------
     st.markdown("---")
+    
+    # 1. 알람 버튼 (상세 정보 전송)
     if st.button("🔔 Send Discord Alarm", use_container_width=True):
-        # 현재 비트코인 가격 정보를 담아서 알림 전송
-        current_price = df.iloc[-1]['BTC_Close']
-        msg = f"📢 **[TOBIT Alert]**\n현재 비트코인 가격: ${current_price:,.0f}\n모델 {selected_model} 모니터링 중입니다."
-        send_discord_alert(msg)
+        with st.spinner("Analyzing & Sending..."):
+            # A. 현재 데이터 수집
+            curr_price = df.iloc[-1]['BTC_Close']
+            curr_sentiment = df.iloc[-1]['Fear_Greed_Index']
+            sentiment_str = "Greed" if curr_sentiment > 60 else "Fear" if curr_sentiment < 40 else "Neutral"
+            
+            # B. 예측값 계산
+            alert_model = get_model(selected_model, selected_seq_len)
+            alert_pred_price = 0
+            trend_emoji = "➡️"
+            
+            if alert_model:
+                inp = df[features].tail(selected_seq_len).values
+                inp_ts = torch.tensor(scaler.transform(inp)).float().unsqueeze(0)
+                with torch.no_grad(): 
+                    out = alert_model(inp_ts).numpy()[0]
+                
+                # 역변환 (마지막 7일차 가격)
+                dummy = np.zeros(len(features))
+                dummy[btc_idx] = out[-1]
+                alert_pred_price = scaler.inverse_transform([dummy])[0][btc_idx]
+                
+                if alert_pred_price > curr_price: trend_emoji = "📈 상승 (Bullish)"
+                else: trend_emoji = "📉 하락 (Bearish)"
+
+            # C. 메시지 구성
+            msg = (
+                f"📢 **[TOBIT AI Alert]**\n"
+                f"━━━━━━━━━━━━━━━━━━\n"
+                f"🗓️ **Model:** {selected_model} (Win: {selected_seq_len})\n"
+                f"💵 **Current BTC:** ${curr_price:,.0f}\n"
+                f"🧠 **Sentiment:** {curr_sentiment:.0f} ({sentiment_str})\n"
+                f"━━━━━━━━━━━━━━━━━━\n"
+                f"🤖 **AI Forecast (7D):** ${alert_pred_price:,.0f}\n"
+                f"📊 **Trend:** {trend_emoji}\n"
+                f"━━━━━━━━━━━━━━━━━━\n"
+                f"Please check the dashboard for details."
+            )
+            send_discord_alert(msg)
+            
+    # 2. 초대 버튼
+    st.link_button("👾 Join TOBIT Discord", "https://discord.gg/mQDsWnpx", use_container_width=True)
+
 
 if menu != "📘 Model Specs":
-    # 로고가 사이드바에 있으므로 메인 화면 로고는 생략하거나 작게 표시
-    # st.markdown("<h2 style='margin-top: 5px;'>TOBIT Analysis Dashboard</h2>", unsafe_allow_html=True)
-    
-    # 헤더 대신 바로 KPI 표시 (스크린샷 느낌대로)
+    # 메인 KPI 섹션
     last_row, prev_row = df.iloc[-1], df.iloc[-2]
     price_diff = last_row['BTC_Close'] - prev_row['BTC_Close']
     def kpi(label, val, delta, color): return f"""<div class="kpi-card"><div class="kpi-label">{label}</div><div class="kpi-value">{val}</div><div class="kpi-delta {color}">{delta}</div></div>"""
@@ -327,8 +358,8 @@ if menu == "📊 Market Forecast":
         
         # 2. Forecast Data (형광색)
         pred_color = '#FFA500' # 기본 오렌지
-        if preds[-1] > preds[0]: pred_color = '#00FF7F' # 상승
-        else: pred_color = '#FF4500' # 하락
+        if preds[-1] > preds[0]: pred_color = '#00FF7F' # 상승: SpringGreen
+        else: pred_color = '#FF4500' # 하락: OrangeRed
 
         fig.add_trace(go.Scatter(
             x=future_dates, 
@@ -344,11 +375,7 @@ if menu == "📊 Market Forecast":
             paper_bgcolor='rgba(0,0,0,0)', 
             plot_bgcolor='rgba(0,0,0,0)', 
             height=350, 
-            xaxis=dict(
-                showgrid=False, 
-                type='date', 
-                tickformat='%m/%d' 
-            ), 
+            xaxis=dict(showgrid=False, type='date', tickformat='%m/%d'), 
             yaxis=dict(showgrid=True, gridcolor='#262a33'), 
             hovermode="x unified", 
             margin=dict(l=20, r=20, t=30, b=20)
@@ -368,7 +395,6 @@ if menu == "📊 Market Forecast":
                     delta=f"{diff:+.0f}"
                 )
         st.markdown("---")
-
     else: st.warning("Model weights not found.")
 
 # [TAB 2] Deep Insight (XAI)
@@ -396,7 +422,6 @@ elif menu == "🧠 Deep Insight (XAI)":
 
         t_l1, t_l2, t_l3 = st.tabs(["Event", "Feature", "Cell"])
         cache_key = f"l_event_{pruning_tol}"
-        
         if cache_key not in st.session_state:
             st.session_state[cache_key] = local_event(f_hs, instance_data, {'rs':42, 'nsamples':800}, None, None, average_event, pos_prun_idx)
             st.session_state[f'l_feat_{pruning_tol}'] = local_feat(f_hs, instance_data, {'rs':42, 'nsamples':800, 'feature_names': features}, None, None, average_event, pos_prun_idx)
@@ -417,7 +442,6 @@ elif menu == "🧠 Deep Insight (XAI)":
                     g_evts.append(local_event(f_hs, s_in, {'rs':42, 'nsamples':100}, None, None, average_event, 0))
                 
                 global_feat = pd.concat(g_feats).groupby("Feature")["Shapley Value"].apply(lambda x: x.abs().mean()).reset_index()
-                
                 evt_list = []
                 for df_evt in g_evts:
                     if 'Feature' not in df_evt.columns: 
@@ -425,7 +449,6 @@ elif menu == "🧠 Deep Insight (XAI)":
                         df_evt.columns = ['Feature', 'Shapley Value']
                     evt_list.append(df_evt)
                 global_evt = pd.concat(evt_list).groupby("Feature")["Shapley Value"].apply(lambda x: x.abs().mean()).reset_index()
-                
                 c1, c2 = st.columns(2)
                 with c1: st.pyplot(get_feature_bar(global_feat, "4. Global Feature"))
                 with c2: st.pyplot(get_event_heatmap(global_evt, "5. Global Event"))
@@ -435,13 +458,11 @@ elif menu == "🧠 Deep Insight (XAI)":
                 try:
                     feat_df = st.session_state.get(f'l_feat_{pruning_tol}')
                     evt_df = st.session_state.get(cache_key)
-                    
                     feat_txt = "\n".join([f"- {r.Feature}: {r['Shapley Value']:.4f}" for _, r in feat_df.head(3).iterrows()]) if feat_df is not None else "N/A"
                     evt_txt = "N/A"
                     if evt_df is not None:
                         if 'Feature' in evt_df.columns: evt_df = evt_df.set_index('Feature')
                         evt_txt = "\n".join([f"- {i}: {r['Shapley Value']:.4f}" for i, r in evt_df.head(3).iterrows()])
-                        
                     prompt = f"[Role] Crypto Analyst.\n[Data]\nFeatures:\n{feat_txt}\nEvents:\n{evt_txt}\n[Task] Explain WHY based on data (Korean, 3 sentences)."
                     res = client.chat.completions.create(model="solar-pro2", messages=[{"role":"user","content":prompt}])
                     st.markdown(f"""<div class="ai-chat-box"><h4>🤖 Solar Pro 2 Insight</h4><p>{res.choices[0].message.content}</p></div>""", unsafe_allow_html=True)
@@ -454,31 +475,23 @@ elif menu == "🧠 Deep Insight (XAI)":
         with cf_c2: 
             cur_val = input_raw[-1, features.index(target)]
             delta = st.slider("Change (%)", -30, 30, 0)
-        
         mod_raw = input_raw.copy()
         mod_raw[-1, features.index(target)] = cur_val * (1 + delta/100)
-        
         with torch.no_grad():
             orig_p = model(torch.tensor(input_scaled).float().unsqueeze(0)).numpy()[0]
             mod_p = model(torch.tensor(scaler.transform(mod_raw)).float().unsqueeze(0)).numpy()[0]
-            
         def inv(p): 
             d = np.zeros(len(features)); d[btc_idx] = p
             return scaler.inverse_transform([d])[0][btc_idx]
-            
         orig_real = [inv(p) for p in orig_p]
         mod_real = [inv(p) for p in mod_p]
         diff = mod_real[-1] - orig_real[-1]
-        
-        with cf_c3: 
-            st.metric("Impact (Day 7)", f"{diff:+.2f} USD")
-            
+        with cf_c3: st.metric("Impact (Day 7)", f"{diff:+.2f} USD")
         fig_cf = go.Figure()
         fig_cf.add_trace(go.Scatter(y=orig_real, name="Original", line=dict(dash='dot', color='#8b949e')))
         fig_cf.add_trace(go.Scatter(y=mod_real, name="What-If", line=dict(color='#58a6ff')))
         fig_cf.update_layout(template='plotly_dark', paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=350, margin=dict(l=20, r=20, t=30, b=20))
         st.plotly_chart(fig_cf, use_container_width=True)
-
         if st.button("✨ Ask AI Analyst (Simulation)"):
             with st.spinner("AI analyzing..."):
                 prompt = f"[Role] Crypto Analyst.\n[Scenario] {target} changes by {delta}%, Price changes by {diff:.2f}.\n[Task] Interpret sensitivity (Korean, 3 sentences)."
@@ -493,7 +506,6 @@ elif menu == "⚡ Strategy Backtest":
     with c2:
         thresh = st.slider("🎯 Target Return (%)", 1.0, 10.0, 5.0, 0.5)
         cap = st.number_input("💰 Initial Capital ($)", 100, 100000, 10000)
-
     if st.button("🚀 Run Simulation"):
         model = get_model(selected_model, selected_seq_len)
         if model:
@@ -501,41 +513,30 @@ elif menu == "⚡ Strategy Backtest":
                 window = 180
                 data = df.tail(window + selected_seq_len).reset_index(drop=True)
                 hist_tensor = torch.tensor(scaler.transform(data[features].values)).float()
-                
                 cash, coin = float(cap), 0.0
                 res, port_hist, bh_hist = [], [], []
-                
                 for i in range(window):
                     idx = i + selected_seq_len
-                    with torch.no_grad():
-                        p_seq = model(hist_tensor[i:idx].unsqueeze(0)).numpy()[0]
-                    
-                    pred_prices = [scaler.inverse_transform(np.pad([p], (btc_idx, len(features)-btc_idx-1)))[0][btc_idx] for p in p_seq] # Simplified Inverse
-                    
+                    with torch.no_grad(): p_seq = model(hist_tensor[i:idx].unsqueeze(0)).numpy()[0]
+                    pred_prices = [scaler.inverse_transform(np.pad([p], (btc_idx, len(features)-btc_idx-1)))[0][btc_idx] for p in p_seq]
                     avg_pred = np.mean(pred_prices)
                     cur_price = data.iloc[idx-1]['BTC_Close']
                     ret_pct = ((avg_pred - cur_price) / cur_price) * 100
-                    
                     action = "HOLD"
                     if ret_pct >= thresh and cash > 0:
                         coin += (cash * 0.9995) / cur_price; cash = 0; action = "BUY"
                     elif ret_pct <= -thresh and coin > 0:
                         cash += (coin * cur_price * 0.9995); coin = 0; action = "SELL"
-                        
                     total = cash + (coin * cur_price)
                     port_hist.append(total)
                     bh_hist.append((cur_price / data.iloc[selected_seq_len-1]['BTC_Close']) * cap)
-                    
                     res.append({"Date": data.iloc[idx-1]['timestamp'], "Price": cur_price, "Return(%)": round(ret_pct, 2), "Action": action, "Total": round(total, 2)})
-                
                 f_ret = (port_hist[-1] - cap) / cap * 100
                 b_ret = (bh_hist[-1] - cap) / cap * 100
-                
                 c1, c2 = st.columns(2)
                 c1.metric("Strategy Return", f"{f_ret:.2f}%", f"${port_hist[-1]:,.0f}")
                 c2.metric("Buy & Hold Return", f"{b_ret:.2f}%", f"${bh_hist[-1]:,.0f}")
                 st.caption("ℹ️ Buy & Hold: 시작일에 전액 매수 후 보유했을 경우의 가치")
-                
                 df_res = pd.DataFrame(res)
                 fig = go.Figure()
                 fig.add_trace(go.Scatter(x=df_res['Date'], y=port_hist, name="TOBIT", line=dict(color='#58a6ff', width=3)))
