@@ -26,9 +26,9 @@ if "feedzai" not in alt.themes.names():
     alt.themes.enable("feedzai")
 
 # ------------------------------------------------------------------------------
-# 1. Path & Page Config (로고 경로 자동 설정)
+# 1. Path & Page Config
 # ------------------------------------------------------------------------------
-# [FIX] 현재 실행 중인 파일(app.py)의 위치를 기준으로 assets 폴더 경로를 찾습니다.
+# [경로 설정] 현재 파일 위치 기준 절대 경로
 current_dir = os.path.dirname(os.path.abspath(__file__))
 logo_path = os.path.join(current_dir, "assets", "logo.png")
 
@@ -111,11 +111,9 @@ except ImportError:
     st.error("model.py 또는 data_utils.py 파일이 누락되었습니다.")
 
 def send_discord_alert(message):
-    """디스코드 웹훅 전송 함수"""
     if not DISCORD_WEBHOOK_URL:
-        st.sidebar.error("🚨 Webhook URL 미설정 (secrets.toml 확인)")
+        st.sidebar.error("🚨 Webhook URL 미설정")
         return
-    
     data = {"content": message}
     try:
         response = requests.post(DISCORD_WEBHOOK_URL, json=data)
@@ -193,7 +191,7 @@ def get_cell_heatmap(cell_df, title):
 # ------------------------------------------------------------------------------
 # 5. Model Logic
 # ------------------------------------------------------------------------------
-WEIGHTS_DIR = os.path.join(current_dir, 'weights') # 가중치 경로도 절대경로로 수정
+WEIGHTS_DIR = os.path.join(current_dir, 'weights')
 MODELS_LIST = ["MLP", "DLinear", "TCN", "LSTM", "PatchTST", "iTransformer"]
 MODEL_CLASSES = {"MLP": MLP, "DLinear": DLinear, "TCN": TCN, "LSTM": LSTMModel, "PatchTST": PatchTST, "iTransformer": iTransformer}
 
@@ -224,9 +222,7 @@ except: btc_idx = 0
 # 6. Sidebar & KPI
 # ------------------------------------------------------------------------------
 with st.sidebar:
-    # --------------------------------------------------------------------------
-    # [FIX] 로고 경로 자동 인식
-    # --------------------------------------------------------------------------
+    # 로고
     if os.path.exists(logo_path):
         st.image(logo_path, use_container_width=True)
     else:
@@ -254,12 +250,9 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
     
-    # --------------------------------------------------------------------------
-    # [NEW] 알람 및 초대 버튼
-    # --------------------------------------------------------------------------
+    # [수정된 부분] 알람 및 초대 버튼 + 설명 추가
     st.markdown("---")
     
-    # 1. 알람 버튼 (상세 정보 전송)
     if st.button("🔔 Send Discord Alarm", use_container_width=True):
         with st.spinner("Analyzing & Sending..."):
             # A. 현재 데이터 수집
@@ -300,13 +293,14 @@ with st.sidebar:
                 f"Please check the dashboard for details."
             )
             send_discord_alert(msg)
+    
+    # [NEW] 버튼 설명 문구 추가
+    st.caption("ℹ️ 클릭 시 현재 시황과 **AI 예측가(7일 후)**가 포함된 요약 리포트를 디스코드로 전송합니다.")
             
-    # 2. 초대 버튼
     st.link_button("👾 Join TOBIT Discord", "https://discord.gg/mQDsWnpx", use_container_width=True)
 
 
 if menu != "📘 Model Specs":
-    # 메인 KPI 섹션
     last_row, prev_row = df.iloc[-1], df.iloc[-2]
     price_diff = last_row['BTC_Close'] - prev_row['BTC_Close']
     def kpi(label, val, delta, color): return f"""<div class="kpi-card"><div class="kpi-label">{label}</div><div class="kpi-value">{val}</div><div class="kpi-delta {color}">{delta}</div></div>"""
@@ -345,7 +339,7 @@ if menu == "📊 Market Forecast":
         
         fig = go.Figure()
         
-        # 1. Historical Data (회색)
+        # 1. Historical
         fig.add_trace(go.Scatter(
             x=df['timestamp'].tail(90), 
             y=df['BTC_Close'].tail(90), 
@@ -356,10 +350,10 @@ if menu == "📊 Market Forecast":
             fillcolor='rgba(200, 200, 200, 0.05)'
         ))
         
-        # 2. Forecast Data (형광색)
-        pred_color = '#FFA500' # 기본 오렌지
-        if preds[-1] > preds[0]: pred_color = '#00FF7F' # 상승: SpringGreen
-        else: pred_color = '#FF4500' # 하락: OrangeRed
+        # 2. Forecast
+        pred_color = '#FFA500' # 오렌지
+        if preds[-1] > preds[0]: pred_color = '#00FF7F' # 상승
+        else: pred_color = '#FF4500' # 하락
 
         fig.add_trace(go.Scatter(
             x=future_dates, 
@@ -382,7 +376,6 @@ if menu == "📊 Market Forecast":
         )
         st.plotly_chart(fig, use_container_width=True)
         
-        # 하단 7일 예측값 개별 표시
         st.markdown("###### 📅 7-Day Forecast Details")
         cols = st.columns(7)
         for i, (date, price) in enumerate(zip(future_dates, preds)):
@@ -467,36 +460,6 @@ elif menu == "🧠 Deep Insight (XAI)":
                     res = client.chat.completions.create(model="solar-pro2", messages=[{"role":"user","content":prompt}])
                     st.markdown(f"""<div class="ai-chat-box"><h4>🤖 Solar Pro 2 Insight</h4><p>{res.choices[0].message.content}</p></div>""", unsafe_allow_html=True)
                 except Exception as e: st.error(str(e))
-
-        st.markdown("---")
-        st.markdown("### 2️⃣ Counterfactual Simulator")
-        cf_c1, cf_c2, cf_c3 = st.columns([1, 1, 2])
-        with cf_c1: target = st.selectbox("Feature", features, index=btc_idx)
-        with cf_c2: 
-            cur_val = input_raw[-1, features.index(target)]
-            delta = st.slider("Change (%)", -30, 30, 0)
-        mod_raw = input_raw.copy()
-        mod_raw[-1, features.index(target)] = cur_val * (1 + delta/100)
-        with torch.no_grad():
-            orig_p = model(torch.tensor(input_scaled).float().unsqueeze(0)).numpy()[0]
-            mod_p = model(torch.tensor(scaler.transform(mod_raw)).float().unsqueeze(0)).numpy()[0]
-        def inv(p): 
-            d = np.zeros(len(features)); d[btc_idx] = p
-            return scaler.inverse_transform([d])[0][btc_idx]
-        orig_real = [inv(p) for p in orig_p]
-        mod_real = [inv(p) for p in mod_p]
-        diff = mod_real[-1] - orig_real[-1]
-        with cf_c3: st.metric("Impact (Day 7)", f"{diff:+.2f} USD")
-        fig_cf = go.Figure()
-        fig_cf.add_trace(go.Scatter(y=orig_real, name="Original", line=dict(dash='dot', color='#8b949e')))
-        fig_cf.add_trace(go.Scatter(y=mod_real, name="What-If", line=dict(color='#58a6ff')))
-        fig_cf.update_layout(template='plotly_dark', paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=350, margin=dict(l=20, r=20, t=30, b=20))
-        st.plotly_chart(fig_cf, use_container_width=True)
-        if st.button("✨ Ask AI Analyst (Simulation)"):
-            with st.spinner("AI analyzing..."):
-                prompt = f"[Role] Crypto Analyst.\n[Scenario] {target} changes by {delta}%, Price changes by {diff:.2f}.\n[Task] Interpret sensitivity (Korean, 3 sentences)."
-                res = client.chat.completions.create(model="solar-pro2", messages=[{"role":"user","content":prompt}])
-                st.markdown(f"""<div class="ai-chat-box"><h4>🤖 Solar Pro 2 Insight</h4><p>{res.choices[0].message.content}</p></div>""", unsafe_allow_html=True)
 
 # [TAB 4] Backtest
 elif menu == "⚡ Strategy Backtest":
