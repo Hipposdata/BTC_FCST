@@ -18,7 +18,7 @@ from datetime import datetime
 from PIL import Image
 
 # ==============================================================================
-# 0. [CRITICAL FIX] TimeSHAP Altair Theme Error Patch
+# 0. Theme Patch
 # ==============================================================================
 def placeholder_theme():
     return {"config": {}}
@@ -28,7 +28,7 @@ if "feedzai" not in alt.themes.names():
     alt.themes.enable("feedzai")
 
 # ------------------------------------------------------------------------------
-# 1. Page Config & TOBIT Theme CSS
+# 1. Page Config
 # ------------------------------------------------------------------------------
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 LOGO_PATH = os.path.join(BASE_DIR, "assets", "logo.png")
@@ -259,7 +259,7 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
 
-    # [RESTORED] 디스코드 알람 + 캡션 + 초대 버튼 복구
+    # [RESTORED] 디스코드 알람 + 캡션 + 초대 버튼
     st.markdown("---")
     if st.button("🔔 Send Report to Discord", use_container_width=True):
         with st.spinner("AI Analyzing Signal..."):
@@ -288,7 +288,6 @@ with st.sidebar:
                 else: st.error(f"전송 실패: {msg}")
             except Exception as e: st.error(f"오류: {e}")
             
-    # [복구된 부분] 기능 설명 및 초대 링크
     st.caption("ℹ️ 클릭 시 현재 시황과 AI 예측(7일 후)이 포함된 요약 리포트를 디스코드로 전송합니다.")
     st.link_button("👾 Join TOBIT Discord", "https://discord.gg/mQDsWnpx", use_container_width=True)
 
@@ -379,14 +378,12 @@ elif menu == "🧠 Deep Insight (XAI)":
                     s_in = X_all[i:i+selected_seq_len].reshape(1, selected_seq_len, -1)
                     g_feats.append(local_feat(f_hs, s_in, {'rs':42, 'nsamples':100, 'feature_names': features}, None, None, average_event, 0))
                     g_evts.append(local_event(f_hs, s_in, {'rs':42, 'nsamples':100}, None, None, average_event, 0))
-                
                 global_feat = pd.concat(g_feats).groupby("Feature")["Shapley Value"].apply(lambda x: x.abs().mean()).reset_index()
                 evt_list = []
                 for df_evt in g_evts:
                     if 'Feature' not in df_evt.columns: df_evt = df_evt.reset_index(); df_evt.columns = ['Feature', 'Shapley Value']
                     evt_list.append(df_evt)
                 global_evt = pd.concat(evt_list).groupby("Feature")["Shapley Value"].apply(lambda x: x.abs().mean()).reset_index()
-                
                 c1, c2 = st.columns(2)
                 with c1: st.pyplot(get_feature_bar(global_feat, "4. Global Feature"), use_container_width=True)
                 with c2: st.pyplot(get_event_heatmap(global_evt, "5. Global Event"), use_container_width=True)
@@ -398,19 +395,15 @@ elif menu == "🧠 Deep Insight (XAI)":
         with cf_c2: 
             cur_val = input_raw[-1, features.index(target)]
             delta = st.slider("Change (%)", -30, 30, 0)
-        
         mod_raw = input_raw.copy()
         mod_raw[-1, features.index(target)] = cur_val * (1 + delta/100)
-        
         with torch.no_grad():
             orig_p = model(torch.tensor(input_scaled).float().unsqueeze(0)).numpy()[0]
             mod_p = model(torch.tensor(scaler.transform(mod_raw)).float().unsqueeze(0)).numpy()[0]
-            
         def inv(p): d = np.zeros(len(features)); d[btc_idx] = p; return scaler.inverse_transform(d.reshape(1, -1))[0][btc_idx]
         orig_real = [inv(p) for p in orig_p]
         mod_real = [inv(p) for p in mod_p]
         diff = mod_real[-1] - orig_real[-1]
-        
         with cf_c3: st.metric("Impact (Day 7)", f"{diff:+.2f} USD")
         fig_cf = go.Figure()
         fig_cf.add_trace(go.Scatter(y=orig_real, name="Original", line=dict(dash='dot', color='#8b949e')))
@@ -424,7 +417,7 @@ elif menu == "🧠 Deep Insight (XAI)":
                 res = client.chat.completions.create(model="solar-pro2", messages=[{"role":"user","content":prompt}])
                 st.markdown(f"""<div class="ai-chat-box"><h4>🤖 Solar Pro 2 Insight</h4><p>{res.choices[0].message.content}</p></div>""", unsafe_allow_html=True)
 
-# [TAB 3] Model Specs
+# [TAB 3] Model Specs (Fix & Complete)
 elif menu == "📘 Model Specs":
     st.markdown("#### 📘 Model Specifications & Architecture")
     st.info("TOBIT 플랫폼에서 활용하는 6가지 시계열 모델의 아키텍처와 상세 스펙입니다.")
@@ -449,42 +442,73 @@ elif menu == "📘 Model Specs":
             st.graphviz_chart(dot)
         with c2:
             st.markdown("**🔧 Key Hyperparameters**")
-            st.table(pd.DataFrame({"Parameter": ["Hidden Size", "Num Layers", "Activation"], "Value": ["128 ~ 256", "2 ~ 3", "ReLU"]}).set_index("Parameter"))
+            st.table(pd.DataFrame({"Parameter": ["Hidden Size", "Num Layers", "Activation", "Dropout"], "Value": ["128 ~ 256", "2 ~ 3", "ReLU", "0.2"]}).set_index("Parameter"))
+            st.markdown("""**✅ Pros**: 빠르고 가벼움 / **❌ Cons**: 시계열 특성 반영 부족""")
 
     with tab_dl:
         c1, c2 = st.columns([1, 1])
         with c1:
-            st.markdown("### **DLinear**")
-            st.write("시계열을 추세(Trend)와 계절성(Seasonality)으로 분해하여 예측합니다.")
+            st.markdown("### **DLinear (Decomposition Linear)**")
+            st.write("시계열을 추세와 계절성으로 분해하여 예측합니다.")
             dot = graphviz.Digraph(graph_attr=graph_attr, node_attr=node_attr, edge_attr=edge_attr)
-            dot.edge('Input', 'Decomp'); dot.edge('Decomp', 'Trend'); dot.edge('Decomp', 'Season'); dot.edge('Trend', 'Output'); dot.edge('Season', 'Output')
+            dot.edge('Input', 'Decomp'); dot.edge('Decomp', 'Trend'); dot.edge('Decomp', 'Seasonal'); dot.edge('Trend', 'Output'); dot.edge('Seasonal', 'Output')
             st.graphviz_chart(dot)
         with c2:
             st.markdown("**🔧 Key Hyperparameters**")
-            st.table(pd.DataFrame({"Parameter": ["Moving Avg", "Features"], "Value": ["25", "All Channels"]}).set_index("Parameter"))
+            st.table(pd.DataFrame({"Parameter": ["Moving Avg Kernel", "Individual Head"], "Value": ["25", "False"]}).set_index("Parameter"))
+            st.markdown("""**✅ Pros**: SOTA급 성능, 해석 용이 / **❌ Cons**: 급격한 변동성 한계""")
 
     with tab_tcn:
-        st.write("### **TCN**")
-        st.write("Dilated Convolution을 활용하여 긴 시계열 데이터를 효율적으로 처리합니다.")
+        c1, c2 = st.columns([1, 1])
+        with c1:
+            st.markdown("### **TCN (Temporal Convolutional Network)**")
+            st.write("Dilated Convolution을 활용하여 긴 시계열 데이터를 효율적으로 처리합니다.")
+            dot = graphviz.Digraph(graph_attr=graph_attr, node_attr=node_attr, edge_attr=edge_attr)
+            dot.edge('Input', 'Dilated Conv 1'); dot.edge('Dilated Conv 1', 'Dilated Conv 2'); dot.edge('Dilated Conv 2', 'Residual'); dot.edge('Residual', 'Output')
+            st.graphviz_chart(dot)
+        with c2:
+            st.markdown("**🔧 Key Hyperparameters**")
+            st.table(pd.DataFrame({"Parameter": ["Kernel Size", "Channels", "Dilation"], "Value": ["3", "64", "2^i"]}).set_index("Parameter"))
+            st.markdown("""**✅ Pros**: 병렬 처리, 긴 수용 영역 / **❌ Cons**: 메모리 사용량""")
 
     with tab_lstm:
         c1, c2 = st.columns([1, 1])
         with c1:
-            st.markdown("### **LSTM**")
+            st.markdown("### **LSTM (Long Short-Term Memory)**")
             st.write("금융 시계열 예측의 표준 모델로, 장단기 기억을 모두 활용합니다.")
             dot = graphviz.Digraph(graph_attr=graph_attr, node_attr=node_attr, edge_attr=edge_attr)
             dot.edge('Input(t)', 'LSTM Cell'); dot.edge('LSTM Cell', 'Hidden(t)'); dot.edge('Hidden(t)', 'Output')
             st.graphviz_chart(dot)
         with c2:
-            st.table(pd.DataFrame({"Parameter": ["Hidden Size", "Layers"], "Value": ["64~128", "2"]}).set_index("Parameter"))
+            st.markdown("**🔧 Key Hyperparameters**")
+            st.table(pd.DataFrame({"Parameter": ["Hidden Size", "Layers", "Dropout"], "Value": ["64~128", "2", "0.2"]}).set_index("Parameter"))
+            st.markdown("""**✅ Pros**: 시퀀스 모델링 강점 / **❌ Cons**: 느린 학습 속도""")
 
     with tab_patch:
-        st.write("### **PatchTST**")
-        st.write("시계열을 패치 단위로 나누어 트랜스포머에 입력하는 최신 모델입니다.")
+        c1, c2 = st.columns([1, 1])
+        with c1:
+            st.markdown("### **PatchTST**")
+            st.write("시계열을 패치 단위로 나누어 트랜스포머에 입력하는 최신 모델입니다.")
+            dot = graphviz.Digraph(graph_attr=graph_attr, node_attr=node_attr, edge_attr=edge_attr)
+            dot.edge('Input', 'Patching'); dot.edge('Patching', 'Transformer'); dot.edge('Transformer', 'Head'); dot.edge('Head', 'Output')
+            st.graphviz_chart(dot)
+        with c2:
+            st.markdown("**🔧 Key Hyperparameters**")
+            st.table(pd.DataFrame({"Parameter": ["Patch Len", "Stride", "d_model"], "Value": ["7", "3", "64"]}).set_index("Parameter"))
+            st.markdown("""**✅ Pros**: 장기 예측 탁월 / **❌ Cons**: 데이터 요구량 많음""")
 
     with tab_itr:
-        st.write("### **iTransformer**")
-        st.write("시간 축이 아닌 변수 축을 임베딩하여 다변량 상관관계를 학습합니다.")
+        c1, c2 = st.columns([1, 1])
+        with c1:
+            st.markdown("### **iTransformer**")
+            st.write("시간 축이 아닌 변수 축을 임베딩하여 다변량 상관관계를 학습합니다.")
+            dot = graphviz.Digraph(graph_attr=graph_attr, node_attr=node_attr, edge_attr=edge_attr)
+            dot.edge('Input', 'Inverted Embed'); dot.edge('Inverted Embed', 'Attention'); dot.edge('Attention', 'Output')
+            st.graphviz_chart(dot)
+        with c2:
+            st.markdown("**🔧 Key Hyperparameters**")
+            st.table(pd.DataFrame({"Parameter": ["d_model", "Layers", "Heads"], "Value": ["256", "3", "4"]}).set_index("Parameter"))
+            st.markdown("""**✅ Pros**: 변수 간 관계 파악 / **❌ Cons**: 무거운 모델""")
 
 # [TAB 4] Backtest
 elif menu == "⚡ Strategy Backtest":
