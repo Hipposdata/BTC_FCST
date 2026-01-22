@@ -85,6 +85,9 @@ st.markdown("""
         border-radius: 10px; padding: 15px; margin-top: 15px;
         color: #e6edf3; font-size: 0.95rem; line-height: 1.5;
     }
+    /* Metric Label Style */
+    [data-testid="stMetricLabel"] { font-size: 0.85rem; color: #8b949e; }
+    [data-testid="stMetricValue"] { font-size: 1.2rem; color: #e6edf3; font-family: 'Roboto Mono', monospace; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -326,13 +329,31 @@ if menu == "📊 Market Forecast":
             preds.append(scaler.inverse_transform(dummy.reshape(1, -1))[0][btc_idx])
             
         future_dates = [pd.to_datetime(df['timestamp'].values[-1]) + pd.Timedelta(days=i) for i in range(1, 8)]
+        
+        # Plot
         fig = go.Figure()
         fig.add_trace(go.Scatter(x=df['timestamp'].tail(90), y=df['BTC_Close'].tail(90), name="Historical", mode='lines', line=dict(color='rgba(139, 148, 158, 0.5)', width=2), fill='tozeroy', fillcolor='rgba(139, 148, 158, 0.1)'))
         pred_color = '#3fb950' if preds[-1] > preds[0] else '#f85149'
         fig.add_trace(go.Scatter(x=future_dates, y=preds, name=f"TOBIT Forecast", mode='lines+markers', line=dict(color=pred_color, width=3), marker=dict(size=6, color='#161b22', line=dict(width=2, color=pred_color))))
         fig.update_layout(template='plotly_dark', paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=350, xaxis=dict(showgrid=False), yaxis=dict(showgrid=True, gridcolor='#262a33'), hovermode="x unified", margin=dict(l=20, r=20, t=30, b=20))
         st.plotly_chart(fig, use_container_width=True)
-        st.markdown(f"""<div style="padding: 15px; border-left: 3px solid {pred_color}; background-color: #161b22;"><span style="color: #8b949e; font-size: 13px;">TOBIT Analysis Summary:</span><br><span style="font-size: 16px; font-weight: bold; color: #e6edf3;">Target Price (7D): ${preds[-1]:,.0f}</span></div>""", unsafe_allow_html=True)
+        
+        # [MODIFIED] Detailed 7-Day Metrics
+        st.markdown("###### 📅 7-Day Forecast Details")
+        cols = st.columns(7)
+        current_close = df['BTC_Close'].iloc[-1]
+        
+        for i, (date, price) in enumerate(zip(future_dates, preds)):
+            with cols[i]:
+                prev_price = preds[i-1] if i > 0 else current_close
+                diff = price - prev_price
+                st.metric(
+                    label=date.strftime("%m/%d (%a)"), 
+                    value=f"${price:,.0f}", 
+                    delta=f"{diff:+.0f}"
+                )
+        st.markdown("---")
+        
     else: st.warning("Model weights not found.")
 
 # [TAB 2] Deep Insight (XAI)
@@ -359,6 +380,7 @@ elif menu == "🧠 Deep Insight (XAI)":
 
         t_l1, t_l2, t_l3 = st.tabs(["Event", "Feature", "Cell"])
         cache_key = f"l_event_{pruning_tol}"
+        
         if cache_key not in st.session_state:
             st.session_state[cache_key] = local_event(f_hs, instance_data, {'rs':42, 'nsamples':800}, None, None, average_event, pos_prun_idx)
             st.session_state[f'l_feat_{pruning_tol}'] = local_feat(f_hs, instance_data, {'rs':42, 'nsamples':800, 'feature_names': features}, None, None, average_event, pos_prun_idx)
@@ -377,17 +399,22 @@ elif menu == "🧠 Deep Insight (XAI)":
                     s_in = X_all[i:i+selected_seq_len].reshape(1, selected_seq_len, -1)
                     g_feats.append(local_feat(f_hs, s_in, {'rs':42, 'nsamples':100, 'feature_names': features}, None, None, average_event, 0))
                     g_evts.append(local_event(f_hs, s_in, {'rs':42, 'nsamples':100}, None, None, average_event, 0))
+                
                 global_feat = pd.concat(g_feats).groupby("Feature")["Shapley Value"].apply(lambda x: x.abs().mean()).reset_index()
+                
+                # Global Event Grouping Fix
                 evt_list = []
                 for df_evt in g_evts:
-                    if 'Feature' not in df_evt.columns: df_evt = df_evt.reset_index(); df_evt.columns = ['Feature', 'Shapley Value']
+                    if 'Feature' not in df_evt.columns: 
+                        df_evt = df_evt.reset_index()
+                        df_evt.columns = ['Feature', 'Shapley Value']
                     evt_list.append(df_evt)
                 global_evt = pd.concat(evt_list).groupby("Feature")["Shapley Value"].apply(lambda x: x.abs().mean()).reset_index()
+                
                 c1, c2 = st.columns(2)
                 with c1: st.pyplot(get_feature_bar(global_feat, "4. Global Feature"), use_container_width=True)
                 with c2: st.pyplot(get_event_heatmap(global_evt, "5. Global Event"), use_container_width=True)
 
-        # [AI ANALYST 1: TimeSHAP]
         if st.button("✨ Ask AI Analyst (TimeSHAP)"):
             with st.spinner("AI analyzing..."):
                 try:
@@ -440,19 +467,23 @@ elif menu == "🧠 Deep Insight (XAI)":
             orig_p = model(torch.tensor(input_scaled).float().unsqueeze(0)).numpy()[0]
             mod_p = model(torch.tensor(scaler.transform(mod_raw)).float().unsqueeze(0)).numpy()[0]
             
-        def inv(p): d = np.zeros(len(features)); d[btc_idx] = p; return scaler.inverse_transform(d.reshape(1, -1))[0][btc_idx]
+        def inv(p): 
+            d = np.zeros(len(features)); d[btc_idx] = p
+            return scaler.inverse_transform([d])[0][btc_idx]
+            
         orig_real = [inv(p) for p in orig_p]
         mod_real = [inv(p) for p in mod_p]
         diff = mod_real[-1] - orig_real[-1]
         
-        with cf_c3: st.metric("Impact (Day 7)", f"{diff:+.2f} USD")
+        with cf_c3: 
+            st.metric("Impact (Day 7)", f"{diff:+.2f} USD")
+            
         fig_cf = go.Figure()
         fig_cf.add_trace(go.Scatter(y=orig_real, name="Original", line=dict(dash='dot', color='#8b949e')))
         fig_cf.add_trace(go.Scatter(y=mod_real, name="What-If", line=dict(color='#58a6ff')))
         fig_cf.update_layout(template='plotly_dark', paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=350, margin=dict(l=20, r=20, t=30, b=20))
         st.plotly_chart(fig_cf, use_container_width=True)
 
-        # [AI ANALYST 2: Simulation]
         if st.button("✨ Ask AI Analyst (Simulation)"):
             with st.spinner("AI analyzing..."):
                 prompt = f"""[Role]
@@ -474,7 +505,7 @@ elif menu == "🧠 Deep Insight (XAI)":
                 res = client.chat.completions.create(model="solar-pro2", messages=[{"role":"user","content":prompt}])
                 st.markdown(f"""<div class="ai-chat-box"><h4>🤖 Solar Pro 2 Insight</h4><p>{res.choices[0].message.content}</p></div>""", unsafe_allow_html=True)
 
-# [TAB 3] Model Specs (Detail Updated)
+# [TAB 3] Model Specs
 elif menu == "📘 Model Specs":
     st.markdown("#### 📘 Model Specifications & Architecture")
     st.info("TOBIT 플랫폼에서 활용하는 6가지 시계열 모델의 아키텍처와 상세 스펙입니다.")
