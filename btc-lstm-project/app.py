@@ -34,7 +34,6 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 LOGO_PATH = os.path.join(BASE_DIR, "assets", "logo.png")
 WEIGHTS_DIR = os.path.join(BASE_DIR, 'weights')
 
-# 이미지 로딩 안전장치
 try:
     if os.path.exists(LOGO_PATH):
         icon_img = Image.open(LOGO_PATH)
@@ -233,12 +232,12 @@ except: btc_idx = 0
 with st.sidebar:
     try:
         if os.path.exists(LOGO_PATH):
-            st.image(Image.open(LOGO_PATH), width=200)
+            st.image(Image.open(LOGO_PATH), use_container_width=True)
         else:
             st.markdown("## 🐻 **TOBIT**")
     except: st.markdown("## 🐻 **TOBIT**")
     
-    st.markdown("### **TOBIT**\n**AI 기반 비트코인 투자 분석 플랫폼**")
+    st.markdown("### **TOBIT**\n*AI 기반 비트코인 투자 분석 플랫폼*")
     st.markdown("---")
     menu = st.radio("MENU", ["📊 Market Forecast", "🧠 Deep Insight (XAI)", "📘 Model Specs", "⚡ Strategy Backtest"])
     st.markdown("---")
@@ -260,8 +259,9 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
 
+    # [RESTORED] 디스코드 알람 + 캡션 + 초대 버튼 복구
     st.markdown("---")
-    if st.button("🔔 Send Report to Discord"):
+    if st.button("🔔 Send Report to Discord", use_container_width=True):
         with st.spinner("AI Analyzing Signal..."):
             try:
                 model = get_model(selected_model, selected_seq_len)
@@ -283,10 +283,14 @@ with st.sidebar:
                     {"name": "🔮 Signal", "value": signal, "inline": False},
                     {"name": "🤖 Model", "value": selected_model, "inline": True}
                 ]
-                success, msg = send_discord_message("📢 TOBIT Alert", f"AI 모델({selected_model}) 분석 결과", fields, color)
+                success, msg = send_discord_message("📢 TOBIT Investment Alert", f"AI 모델({selected_model}) 분석 결과", fields, color)
                 if success: st.success("전송 완료!")
                 else: st.error(f"전송 실패: {msg}")
             except Exception as e: st.error(f"오류: {e}")
+            
+    # [복구된 부분] 기능 설명 및 초대 링크
+    st.caption("ℹ️ 클릭 시 현재 시황과 AI 예측(7일 후)이 포함된 요약 리포트를 디스코드로 전송합니다.")
+    st.link_button("👾 Join TOBIT Discord", "https://discord.gg/mQDsWnpx", use_container_width=True)
 
 if menu != "📘 Model Specs":
     c_logo, c_title = st.columns([0.08, 0.92])
@@ -414,12 +418,17 @@ elif menu == "🧠 Deep Insight (XAI)":
         fig_cf.update_layout(template='plotly_dark', paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)', height=350, margin=dict(l=20, r=20, t=30, b=20))
         st.plotly_chart(fig_cf, use_container_width=True)
 
-# [TAB 3] Model Specs (복구됨 + 시각화 추가)
+        if st.button("✨ Ask AI Analyst (Simulation)"):
+            with st.spinner("AI analyzing..."):
+                prompt = f"[Role] Crypto Analyst.\n[Scenario] {target} changes by {delta}%, Price changes by {diff:.2f}.\n[Task] Interpret sensitivity (Korean, 3 sentences)."
+                res = client.chat.completions.create(model="solar-pro2", messages=[{"role":"user","content":prompt}])
+                st.markdown(f"""<div class="ai-chat-box"><h4>🤖 Solar Pro 2 Insight</h4><p>{res.choices[0].message.content}</p></div>""", unsafe_allow_html=True)
+
+# [TAB 3] Model Specs
 elif menu == "📘 Model Specs":
     st.markdown("#### 📘 Model Specifications & Architecture")
     st.info("TOBIT 플랫폼에서 활용하는 6가지 시계열 모델의 아키텍처와 상세 스펙입니다.")
     
-    # 아키텍처 다이어그램 스타일 설정
     graph_attr = {'bgcolor': 'transparent', 'rankdir': 'LR', 'nodesep': '0.5', 'ranksep': '0.5'}
     node_attr = {'shape': 'box', 'style': 'filled', 'fillcolor': '#1f242c', 'fontcolor': 'white', 'color': '#58a6ff', 'fontname': 'Roboto'}
     edge_attr = {'color': '#8b949e'}
@@ -433,179 +442,49 @@ elif menu == "📘 Model Specs":
         with c1:
             st.markdown("### **MLP (Multi-Layer Perceptron)**")
             st.write("가장 기초적인 심층 신경망으로, 비선형 패턴을 단순하게 학습합니다.")
-            
             dot = graphviz.Digraph(graph_attr=graph_attr, node_attr=node_attr, edge_attr=edge_attr)
             dot.edge('Input (Lag)', 'Hidden Layer 1')
             dot.edge('Hidden Layer 1', 'Hidden Layer 2')
             dot.edge('Hidden Layer 2', 'Output (Price)')
             st.graphviz_chart(dot)
-            
         with c2:
             st.markdown("**🔧 Key Hyperparameters**")
-            st.table(pd.DataFrame({
-                "Parameter": ["Hidden Size", "Num Layers", "Activation", "Dropout"],
-                "Value": ["128 ~ 256", "2 ~ 3", "ReLU", "0.2"]
-            }).set_index("Parameter"))
-            st.markdown("""
-            **✅ Pros**
-            - 구조가 단순하고 학습 속도가 매우 빠름.
-            - 데이터가 적을 때도 오버피팅 위험이 상대적으로 적음.
-            
-            **❌ Cons**
-            - 시계열의 시간적 순서(Temporal Order)를 고려하지 않음.
-            - 장기 의존성(Long-term dependency) 포착 불가.
-            """)
+            st.table(pd.DataFrame({"Parameter": ["Hidden Size", "Num Layers", "Activation"], "Value": ["128 ~ 256", "2 ~ 3", "ReLU"]}).set_index("Parameter"))
 
     with tab_dl:
         c1, c2 = st.columns([1, 1])
         with c1:
-            st.markdown("### **DLinear (Decomposition Linear)**")
-            st.write("시계열을 추세(Trend)와 계절성(Seasonality)으로 분해하여 각각 예측 후 합치는 모델입니다.")
-            
+            st.markdown("### **DLinear**")
+            st.write("시계열을 추세(Trend)와 계절성(Seasonality)으로 분해하여 예측합니다.")
             dot = graphviz.Digraph(graph_attr=graph_attr, node_attr=node_attr, edge_attr=edge_attr)
-            dot.node('Decomp', 'Series Decomposition\n(Moving Avg)', shape='ellipse', color='#d29922')
-            dot.edge('Input', 'Decomp')
-            dot.edge('Decomp', 'Trend Component')
-            dot.edge('Decomp', 'Seasonal Component')
-            dot.edge('Trend Component', 'Linear (Trend)')
-            dot.edge('Seasonal Component', 'Linear (Seasonal)')
-            dot.edge('Linear (Trend)', 'Sum', color='#3fb950')
-            dot.edge('Linear (Seasonal)', 'Sum', color='#3fb950')
-            dot.edge('Sum', 'Output')
+            dot.edge('Input', 'Decomp'); dot.edge('Decomp', 'Trend'); dot.edge('Decomp', 'Season'); dot.edge('Trend', 'Output'); dot.edge('Season', 'Output')
             st.graphviz_chart(dot)
-
         with c2:
             st.markdown("**🔧 Key Hyperparameters**")
-            st.table(pd.DataFrame({
-                "Parameter": ["Moving Avg Kernel", "Individual Head", "Features"],
-                "Value": ["25", "False (Shared)", "All Channels"]
-            }).set_index("Parameter"))
-            st.markdown("""
-            **✅ Pros**
-            - **SOTA급 성능**: 복잡한 트랜스포머보다 시계열 예측에서 더 나은 성능을 자주 보임.
-            - 해석이 쉽고(Trend/Seasonal) 매우 가벼움.
-            
-            **❌ Cons**
-            - 비선형적이고 급격한 변화가 많은 데이터(Crypto)에서는 한계가 있을 수 있음.
-            """)
+            st.table(pd.DataFrame({"Parameter": ["Moving Avg", "Features"], "Value": ["25", "All Channels"]}).set_index("Parameter"))
 
     with tab_tcn:
-        c1, c2 = st.columns([1, 1])
-        with c1:
-            st.markdown("### **TCN (Temporal Convolutional Network)**")
-            st.write("Dilated Convolution을 사용하여 긴 시간 범위를 효율적으로 처리하는 CNN 기반 모델입니다.")
-            
-            dot = graphviz.Digraph(graph_attr=graph_attr, node_attr=node_attr, edge_attr=edge_attr)
-            dot.edge('Input', 'Dilated Conv Block 1')
-            dot.edge('Dilated Conv Block 1', 'Dilated Conv Block 2')
-            dot.edge('Dilated Conv Block 2', 'Residual Conn')
-            dot.edge('Residual Conn', 'Output')
-            st.graphviz_chart(dot)
-
-        with c2:
-            st.markdown("**🔧 Key Hyperparameters**")
-            st.table(pd.DataFrame({
-                "Parameter": ["Kernel Size", "Num Channels", "Dropout", "Dilation"],
-                "Value": ["3", "[64, 64, 64]", "0.2", "2^i"]
-            }).set_index("Parameter"))
-            st.markdown("""
-            **✅ Pros**
-            - 병렬 처리가 가능하여 RNN(LSTM)보다 학습 속도가 빠름.
-            - Receptive Field를 조절하여 아주 긴 과거 데이터도 참조 가능.
-            
-            **❌ Cons**
-            - 메모리 사용량이 많을 수 있음.
-            """)
+        st.write("### **TCN**")
+        st.write("Dilated Convolution을 활용하여 긴 시계열 데이터를 효율적으로 처리합니다.")
 
     with tab_lstm:
         c1, c2 = st.columns([1, 1])
         with c1:
-            st.markdown("### **LSTM (Long Short-Term Memory)**")
-            st.write("전통적인 RNN의 기울기 소실 문제를 해결한, 금융 시계열의 표준 모델입니다.")
-            
+            st.markdown("### **LSTM**")
+            st.write("금융 시계열 예측의 표준 모델로, 장단기 기억을 모두 활용합니다.")
             dot = graphviz.Digraph(graph_attr=graph_attr, node_attr=node_attr, edge_attr=edge_attr)
-            dot.node('Cell', 'LSTM Cell\n(Forget/Input/Output Gates)', shape='ellipse', color='#d29922')
-            dot.edge('Input (t)', 'Cell')
-            dot.edge('Hidden (t-1)', 'Cell')
-            dot.edge('Cell', 'Hidden (t)')
-            dot.edge('Hidden (t)', 'Fully Connected')
-            dot.edge('Fully Connected', 'Output')
+            dot.edge('Input(t)', 'LSTM Cell'); dot.edge('LSTM Cell', 'Hidden(t)'); dot.edge('Hidden(t)', 'Output')
             st.graphviz_chart(dot)
-
         with c2:
-            st.markdown("**🔧 Key Hyperparameters**")
-            st.table(pd.DataFrame({
-                "Parameter": ["Hidden Size", "Num Layers", "Bidirectional", "Dropout"],
-                "Value": ["64 ~ 128", "2", "False", "0.2"]
-            }).set_index("Parameter"))
-            st.markdown("""
-            **✅ Pros**
-            - 시간의 순서(Sequence)를 명확하게 모델링함.
-            - 노이즈가 많은 금융 데이터에서 여전히 강력한 성능을 발휘.
-            
-            **❌ Cons**
-            - 순차적 계산으로 인해 학습 속도가 느림.
-            - 시퀀스가 매우 길어지면 초기 정보를 잊어버리는 경향이 있음.
-            """)
+            st.table(pd.DataFrame({"Parameter": ["Hidden Size", "Layers"], "Value": ["64~128", "2"]}).set_index("Parameter"))
 
     with tab_patch:
-        c1, c2 = st.columns([1, 1])
-        with c1:
-            st.markdown("### **PatchTST (Patch Time Series Transformer)**")
-            st.write("시계열을 이미지 패치처럼 잘라서 트랜스포머에 넣는 최신 모델입니다.")
-            
-            dot = graphviz.Digraph(graph_attr=graph_attr, node_attr=node_attr, edge_attr=edge_attr)
-            dot.node('Patch', 'Patching\n(Stride=3)', shape='component')
-            dot.edge('Input', 'Patch')
-            dot.edge('Patch', 'Transformer Encoder')
-            dot.edge('Transformer Encoder', 'Flatten')
-            dot.edge('Flatten', 'Linear Head')
-            dot.edge('Linear Head', 'Output')
-            st.graphviz_chart(dot)
-
-        with c2:
-            st.markdown("**🔧 Key Hyperparameters**")
-            st.table(pd.DataFrame({
-                "Parameter": ["Patch Len", "Stride", "d_model", "n_heads", "n_layers"],
-                "Value": ["7", "3", "64", "4", "2"]
-            }).set_index("Parameter"))
-            st.markdown("""
-            **✅ Pros**
-            - **Long-term Forecasting**: 아주 긴 미래 예측에 탁월함.
-            - 지역적 의미(Local semantic)를 보존하면서 연산량을 획기적으로 줄임.
-            
-            **❌ Cons**
-            - 데이터가 적을 경우 오버피팅 가능성이 높음.
-            """)
+        st.write("### **PatchTST**")
+        st.write("시계열을 패치 단위로 나누어 트랜스포머에 입력하는 최신 모델입니다.")
 
     with tab_itr:
-        c1, c2 = st.columns([1, 1])
-        with c1:
-            st.markdown("### **iTransformer (Inverted Transformer)**")
-            st.write("시간 축이 아닌 변수(Feature) 축을 임베딩하여, 다변량 상관관계를 학습하는 모델입니다.")
-            
-            dot = graphviz.Digraph(graph_attr=graph_attr, node_attr=node_attr, edge_attr=edge_attr)
-            dot.node('Embed', 'Inverted Embedding\n(Time Series as Token)', shape='box', color='#d29922')
-            dot.edge('Input (Multi-variate)', 'Embed')
-            dot.edge('Embed', 'Self-Attention\n(Among Variables)')
-            dot.edge('Self-Attention\n(Among Variables)', 'Feed Forward')
-            dot.edge('Feed Forward', 'Output')
-            st.graphviz_chart(dot)
-
-        with c2:
-            st.markdown("**🔧 Key Hyperparameters**")
-            st.table(pd.DataFrame({
-                "Parameter": ["d_model", "n_heads", "n_layers", "Dropout"],
-                "Value": ["256", "4", "3", "0.2"]
-            }).set_index("Parameter"))
-            st.markdown("""
-            **✅ Pros**
-            - **Multivariate Correlation**: 비트코인 가격뿐만 아니라 거래량, 금리 등 변수 간의 관계를 잘 파악함.
-            - 최근 시계열 학계에서 가장 주목받는 구조 중 하나.
-            
-            **❌ Cons**
-            - 모델 크기가 커서 학습 및 추론 시간이 가장 오래 걸림.
-            """)
+        st.write("### **iTransformer**")
+        st.write("시간 축이 아닌 변수 축을 임베딩하여 다변량 상관관계를 학습합니다.")
 
 # [TAB 4] Backtest
 elif menu == "⚡ Strategy Backtest":
