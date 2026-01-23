@@ -25,7 +25,7 @@
 ## 📑 Contents
 1. [Preview](#-preview)
 2. [Key Points](#-key-points)
-3. [System Architecture](#-system-architecture)
+3. [Pipeline](#-Pipeline)
 4. [Dashboard Manual](#%EF%B8%8F-dashboard-manual)
 5. [Data & Models](#-data--models)
 6. [Installation & Usage](#-installation--usage)
@@ -84,7 +84,7 @@ TOBIT은 단순한 예측 결과를 넘어, XAI 기법과 LLM을 통해 직관�
 
 ---
 
-## 🛠 System Architecture
+## 🛠 Pipeline
 
 데이터 파이프라인은 다양한 **외부 API**를 통해 데이터를 수집하며, **자동화된 투자 봇**과 **분석용 대시보드**로 나뉩니다.
 
