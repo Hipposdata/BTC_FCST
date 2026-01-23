@@ -34,7 +34,13 @@
 ---
 
 ## 📺 Preview
-<video src="https://github.com/Hipposdata/BTC_FCST/raw/main/btc-lstm-project/assets/TOBIT_demo.mp4" controls="controls" width="100%"></video>
+
+<a href="https://github.com/Hipposdata/BTC_FCST/raw/main/btc-lstm-project/assets/TOBIT_demo.mp4">
+  <img src="https://github.com/Hipposdata/BTC_FCST/blob/main/btc-lstm-project/assets/demo_full_screen.png?raw=true" width="100%" alt="Click to Watch Demo Video">
+</a>
+> 👆 위 화면을 클릭하면 **TOBIT 데모 영상(.mp4)**을 확인할 수 있습니다.
+
+<br>
 
 | **1. Market Forecast** | **2. Model Architecture & Specs** |
 |:---:|:---:|
