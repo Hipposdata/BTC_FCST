@@ -9,7 +9,7 @@
 >
 > "단순한 예측(Forecast)을 넘어, 설명(Explain)하고 시뮬레이션(Simulate)합니다."
 
-**TOBIT**은 다양한 시계열 모델(PatchTST, iTransformer 등)과 **XAI(Explainable AI)** 파이프라인을 결합한 비트코인 분석 플랫폼입니다.
+**TOBIT**은 다양한 시계열 예측 모델(PatchTST, iTransformer 등)과 **XAI(Explainable AI)** 파이프라인을 결합한 비트코인 분석 플랫폼입니다.
 
 단순히 미래 가격을 예측하는 것을 넘어, **TimeSHAP**, **Counterfactual Simulator**를 통해 예측의 근거를 설명하고 **LLM**을 통해 복잡한 분석 결과를 알기 쉽게 해석합니다. 특히, **임계값(Threshold) 기반 투자 전략**을 적용하여 노이즈를 필터링하고 확실한 수익 기회에만 매매 시그널을 생성합니다.
 
@@ -34,6 +34,7 @@
 ---
 
 ## 📺 Preview
+<video src="https://github.com/Hipposdata/BTC_FCST/raw/main/btc-lstm-project/assets/TOBIT_demo.mp4" controls="controls" width="100%"></video>
 
 | **1. Market Forecast** | **2. Model Architecture & Specs** |
 |:---:|:---:|
