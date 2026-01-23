@@ -9,13 +9,13 @@
 >
 > "단순한 예측(Forecast)을 넘어, 설명(Explain)하고 시뮬레이션(Simulate)합니다."
 
-**TOBIT**은 최신 시계열 모델(PatchTST, iTransformer 등)과 강력한 **XAI(설명 가능한 AI)** 파이프라인을 결합한 비트코인 분석 플랫폼입니다.
+**TOBIT**은 다양한 시계열 모델(PatchTST, iTransformer 등)과 **XAI(Explainable AI)** 파이프라인을 결합한 비트코인 분석 플랫폼입니다.
 
-단순히 미래 가격을 예측하는 것을 넘어, **TimeSHAP**을 통해 예측의 근거를 설명하고, **Counterfactual Simulator**와 **LLM**을 통해 시장 변수 변화에 따른 시나리오를 검증합니다. 특히, **임계값(Threshold) 기반 투자 전략**을 적용하여 노이즈를 필터링하고 확실한 수익 기회에만 매매 시그널을 생성합니다.
+단순히 미래 가격을 예측하는 것을 넘어, **TimeSHAP**, **Counterfactual Simulator**를 통해 예측의 근거를 설명하고 **LLM**을 통해 복잡한 분석 결과를 알기 쉽게 해석합니다. 특히, **임계값(Threshold) 기반 투자 전략**을 적용하여 노이즈를 필터링하고 확실한 수익 기회에만 매매 시그널을 생성합니다.
 
 ---
 
-## 📑 Table of Contents
+## 📑 Contents
 1. [Preview](#-preview)
 2. [Key Points](#-key-points)
 3. [System Architecture](#-system-architecture)
@@ -45,7 +45,7 @@
 ### 1. XAI (Explainable AI) & LLM Insight
 TOBIT은 단순한 예측 결과를 넘어, XAI 기법과 LLM을 통해 직관적인 투자 인사이트를 제공합니다.
 
-* **TimeSHAP (Hierarchical Interpretability):** "모델이 **왜** 그런 예측을 했는가?"를 다각도로 분석합니다.
+* **TimeSHAP:** "모델이 **왜** 그런 예측을 했는가?"를 다각도로 분석합니다.
     * **Local Analysis (개별 예측 설명):**
         * **Feature-Level:** 거래량, 금리, 심리지수 중 어떤 **변수**가 이번 예측을 주도했는지 파악합니다.
         * **Event-Level:** 과거 14~45일(Lookback Window) 중 결정적이었던 **특정 시점**을 포착합니다.
@@ -60,7 +60,7 @@ TOBIT은 단순한 예측 결과를 넘어, XAI 기법과 LLM을 통해 직관�
 
 * **LLM Analyst (Easy-to-Understand):** "그래서 이게 무슨 뜻인가?"
     * 복잡한 **TimeSHAP 히트맵**과 **시뮬레이션 결과**를 **LLM(Solar-Pro2)**이 종합적으로 분석합니다.
-    * 전문 용어 대신 누구나 이해하기 쉬운 자연어로 투자 리포트와 리스크 관리 전략을 제안합니다.
+    * 전문 용어 대신 누구나 이해하기 쉬운 자연어로 복잡한 분석 결과를 알기 쉽게 해석합니다.
 
 ### 2. Time-Series Forecasting Models
 * **Transformer-based:** **PatchTST**, **iTransformer** (장기 시계열 및 다변량 상관관계 학습 최적화)
@@ -68,9 +68,9 @@ TOBIT은 단순한 예측 결과를 넘어, XAI 기법과 LLM을 통해 직관�
 
 ### 3. Strategic Investment & Automation
 단순 예측값이 아닌, 실전 투자에 적합한 전략을 자동화했습니다.
-* **Threshold-based Strategy (임계값 전략):** 예측된 **수익률(Return)**이 설정된 임계값(Threshold, 예: ±5%)을 초과할 때만 `BUY/SELL` 시그널을 생성합니다. 이를 통해 잦은 매매로 인한 손실(수수료 과대)을 방지합니다.
+* **Threshold-based Strategy (임계값 전략):** 예측된 **수익률(Return)**이 설정된 임계값(Threshold, 예: ±5%)을 초과할 때만 `BUY/SELL` 시그널을 생성합니다. 이를 통해 잦은 매매로 인한 손실(수수료 과대)을 방지합니다. (7일 예측 수익률 평균 vs 현재 실제값)
 * **Daily Discord Bot:** 매일 아침 9시, 최신 데이터를 수집하고 추론(Inference)을 수행하여 전략 리포트를 디스코드로 발송합니다.
-* **Backtesting Engine:** 과거 데이터를 기반으로 해당 전략의 누적 수익률을 시뮬레이션하고 검증할 수 있습니다.
+* **Backtesting:** 과거 데이터를 기반으로 해당 전략의 누적 수익률을 시뮬레이션하고 검증할 수 있습니다.
 
 ---
 
