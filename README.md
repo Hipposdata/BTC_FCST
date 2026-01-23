@@ -35,15 +35,13 @@
 
 | **3. Deep Insight (XAI - LLM)** | **4. Deep Insight (XAI - Detail)** |
 |:---:|:---:|
-| <img src="https://github.com/Hipposdata/BTC_FCST/blob/main/btc-lstm-project/assets/demo_xai_Timeshap_LLM.png?raw=true" alt="XAI LLM" width="100%"> | <img src="https://github.com/Hipposdata/BTC_FCST/blob/main/btc-lstm-project/assets/demo_xai_Timeshap_pruning.png?raw=true" alt="Pruning" width="32%"> <img src="https://github.com/Hipposdata/BTC_FCST/blob/main/btc-lstm-project/assets/demo_xai_Timeshap_global.png?raw=true" alt="Global" width="32%"> <img src="https://github.com/Hipposdata/BTC_FCST/blob/main/btc-lstm-project/assets/demo_xai_Timeshap_cell.png?raw=true" alt="Cell" width="32%"> |
-| Solar-Pro2 LLM 기반 자연어 투자 리포트 | Pruning(좌), Global(중), Cell-level(우) 다각도 분석 |
+| <img src="https://github.com/Hipposdata/BTC_FCST/blob/main/btc-lstm-project/assets/demo_xai_Timeshap_LLM.png?raw=true" alt="XAI LLM" width="100%"> | <img src="https://github.com/Hipposdata/BTC_FCST/blob/main/btc-lstm-project/assets/demo_xai_cf.png?raw=true" alt="Counterfactual" width="100%"> <br> <img src="https://github.com/Hipposdata/BTC_FCST/blob/main/btc-lstm-project/assets/demo_xai_Timeshap_pruning.png?raw=true" alt="Pruning" width="32%"> <img src="https://github.com/Hipposdata/BTC_FCST/blob/main/btc-lstm-project/assets/demo_xai_Timeshap_global.png?raw=true" alt="Global" width="32%"> <img src="https://github.com/Hipposdata/BTC_FCST/blob/main/btc-lstm-project/assets/demo_xai_Timeshap_cell.png?raw=true" alt="Cell" width="32%"> |
+| Solar-Pro2 LLM 기반 자연어 투자 리포트 | **Counterfactual Simulator(상)** 및 TimeSHAP 다각도 분석(하) |
 
 | **5. Discord Notification** | **6. Strategy Backtest** |
 |:---:|:---:|
 | <img src="https://github.com/Hipposdata/BTC_FCST/blob/main/btc-lstm-project/assets/demo_alarm_discord.png?raw=true" alt="Discord Bot" width="100%"> | <img src="https://github.com/Hipposdata/BTC_FCST/blob/main/btc-lstm-project/assets/demo_back_score.png?raw=true" alt="Backtest Graph" width="48%"> <img src="https://github.com/Hipposdata/BTC_FCST/blob/main/btc-lstm-project/assets/demo_back_table.png?raw=true" alt="Backtest Table" width="48%"> |
 | 매일 아침 전송되는 투자 전략 알림 | **깊은 하락장 직전 매도(Cash Out)를 통한 수익률 방어 성공** |
-
----
 
 ## 💡 Key Points
 
