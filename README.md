@@ -23,7 +23,7 @@
 5. [Data & Models](#-data--models)
 6. [Installation & Usage](#-installation--usage)
 7. [Project Structure](#-project-structure)
-
+8. [Limitations & Improvements](#-limitations--future-improvements)
 ---
 
 ## 📺 Preview
