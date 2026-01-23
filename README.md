@@ -30,12 +30,12 @@
 
 | **Market Forecast** | **Deep Insight (XAI)** |
 |:---:|:---:|
-| <img src="assets/demo_forecast.png" alt="Forecast" width="100%"> | <img src="assets/demo_xai.png" alt="XAI" width="100%"> |
-| 실시간 가격 예측 및 경제 지표 대시보드 | TimeSHAP 히트맵 및 Counterfactual 시뮬레이션 |
+| <img src="assets/demo_forecast.png" alt="Forecast" width="100%"> | <img src="assets/demo_xai_Timeshap_LLM.png" alt="XAI" width="100%"> |
+| 실시간 가격 예측 및 경제 지표 대시보드 | TimeSHAP 히트맵 및 Solar-Pro2 LLM 분석 |
 
 | **Discord Notification** | **Strategy Backtest** |
 |:---:|:---:|
-| <img src="assets/demo_discord.png" alt="Discord Bot" width="100%"> | <img src="assets/demo_backtest.png" alt="Backtest" width="100%"> |
+| <img src="assets/demo_alarm_discord.png" alt="Discord Bot" width="100%"> | <img src="assets/image_db6bf0.png" alt="Backtest" width="100%"> |
 | 매일 아침 전송되는 투자 전략 리포트 | 매수/매도 시뮬레이션 및 수익률 검증 |
 
 ---
