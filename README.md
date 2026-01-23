@@ -5,7 +5,7 @@
 ![Streamlit](https://img.shields.io/badge/Streamlit-1.50.0-FF4B4B?style=flat-square&logo=streamlit&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)
 
-> **ToBigs Conference TSF 2025 Project**
+> **ToBigs Conference TOBIT Project**
 >
 > "단순한 예측(Forecast)을 넘어, 설명(Explain)하고 시뮬레이션(Simulate)합니다."
 
@@ -19,7 +19,7 @@
 1. [Preview](#-preview)
 2. [Key Points](#-key-points)
 3. [System Architecture](#-system-architecture)
-4. [Dashboard Manual](#-dashboard-manual)
+4. [Dashboard Manual](#%EF%B8%8F-dashboard-manual)
 5. [Data & Models](#-data--models)
 6. [Installation & Usage](#-installation--usage)
 7. [Project Structure](#-project-structure)
@@ -62,13 +62,13 @@ TOBIT은 단순한 예측 결과를 넘어, XAI 기법과 LLM을 통해 직관�
     * 복잡한 **TimeSHAP 히트맵**과 **시뮬레이션 결과**를 **LLM(Solar-Pro2)**이 종합적으로 분석합니다.
     * 전문 용어 대신 누구나 이해하기 쉬운 자연어로 투자 리포트와 리스크 관리 전략을 제안합니다.
 
-### 2. SOTA Forecasting Models
+### 2. Time-Series Forecasting Models
 * **Transformer-based:** **PatchTST**, **iTransformer** (장기 시계열 및 다변량 상관관계 학습 최적화)
-* **NN-based:** **DLinear** (추세/계절성 분해), **TCN** (Dilated Conv), **LSTM**
+* **NN-based:** **DLinear** (추세/계절성 분해), **TCN** (Dilated Conv), **LSTM**, **MLP**
 
 ### 3. Strategic Investment & Automation
 단순 예측값이 아닌, 실전 투자에 적합한 전략을 자동화했습니다.
-* **Threshold-based Strategy (임계값 전략):** 예측된 **수익률(Return)**이 설정된 임계값(Threshold, 예: ±5%)을 초과할 때만 `STRONG BUY/SELL` 시그널을 생성합니다. 이를 통해 횡보장(Sideways Market)에서의 잦은 매매로 인한 손실(Whipsaw)을 방지합니다.
+* **Threshold-based Strategy (임계값 전략):** 예측된 **수익률(Return)**이 설정된 임계값(Threshold, 예: ±5%)을 초과할 때만 `BUY/SELL` 시그널을 생성합니다. 이를 통해 잦은 매매로 인한 손실(수수료 과대)을 방지합니다.
 * **Daily Discord Bot:** 매일 아침 9시, 최신 데이터를 수집하고 추론(Inference)을 수행하여 전략 리포트를 디스코드로 발송합니다.
 * **Backtesting Engine:** 과거 데이터를 기반으로 해당 전략의 누적 수익률을 시뮬레이션하고 검증할 수 있습니다.
 
@@ -92,8 +92,8 @@ graph TD
     S["📅 Scheduler<br/>(Cron / GitHub Actions)"] -->|Trigger| D[Daily Bot]
     D --> C
     C -->|"예상 수익률 %<br/>(Pred Return)"| STR{"⚖️ Investment<br/>Strategy"}
-    STR --"|Return| > 5%"--> BUY["🔥 Strong<br/>Buy/Sell Signal"]
-    STR --"|Return| <= 5%"--> HOLD["✋ Hold /<br/>Neutral"]
+    STR --"|수익률(Return| > 5%"--> BUY["🔥 Strong<br/>Buy/Sell Signal"]
+    STR --"|수익률(Return| <= 5%"--> HOLD["✋ Hold<br/>"]
     BUY & HOLD -->|Report| WEB["🔔 Discord<br/>Webhook"]
     end
     
@@ -122,7 +122,6 @@ TOBIT 대시보드(`app.py`)는 4가지 핵심 탭으로 구성되어 있습니�
 
 ### 3. 📘 Model Specs
 * **기능:** 프로젝트에 사용된 6가지 시계열 모델(MLP, LSTM, TCN, DLinear, PatchTST, iTransformer)의 **아키텍처 다이어그램**과 핵심 하이퍼파라미터를 설명합니다.
-* **활용:** 각 모델의 장단점과 구조적 특징을 학습하거나 발표 자료로 활용할 수 있습니다.
 
 ### 4. ⚡ Strategy Backtest
 * **기능:** 사용자가 설정한 **초기 자본금($)**과 **목표 수익률(Threshold %)**을 기반으로 과거 데이터를 시뮬레이션합니다.
@@ -158,7 +157,7 @@ Python 3.9 환경에서 최적화되어 있습니다.
 git clone [https://github.com/your-username/tobit.git](https://github.com/your-username/tobit.git)
 cd tobit
 
-# Conda 사용 시 (권장)
+# Conda 사용 시
 conda env create -f environment.yml
 conda activate btc-env
 
@@ -183,7 +182,7 @@ python train.py
 ```
 
 ### 4. Run Dashboard
-예측 및 XAI 분석(TimeSHAP, Counterfactual)을 웹 인터페이스로 확인합니다.
+예측 및 XAI 분석(TimeSHAP, Counterfactual), 백테스팅 결과 등을 웹 인터페이스로 확인합니다.
 ```bash
 streamlit run app.py
 ```
@@ -216,24 +215,28 @@ tobit/
 
 ## 💭 Limitations & Future Improvements
 
-**1. Data Latency & Frequency**
-* **한계:** FRED의 경제 지표(CPI, M2)는 월간/주간 단위로 발표되므로, 일간 단위 예측 모델에서는 Forward-Fill 방식으로 인한 시차(Lag)가 발생할 수 있습니다.
-* **개선:** 실시간 뉴스 데이터 감성 분석(Sentiment Analysis)이나 온체인(On-chain) 데이터를 추가하여 데이터의 최신성을 보완할 예정입니다.
+**1. Data Diversity for Volatility (데이터 다양성)**
+* **한계:** 비트코인은 변동성이 매우 크기 때문에, 현재의 가격 및 거시경제 지표(Macro)만으로는 시장의 급격한 심리 변화를 즉각 반영하기 어렵습니다.
+* **개선:** 실시간 뉴스 기사, 소셜 미디어 등의 비정형 데이터를 모델 입력(Input)으로 추가하고, 최신 뉴스 감성 분석(Sentiment Analysis)을 결합하여 예측의 정교함을 높이는 방안을 고려할 수 있습니다.
 
-**2. Model Generalization**
-* **한계:** 특정 기간(Lookback Window)에 최적화된 모델은 급격한 시장 충격(Black Swan) 발생 시 대응력이 떨어질 수 있습니다.
-* **개선:** 주기적인 재학습(Retraining) 파이프라인(CI/CD)을 고도화하고, Online Learning 기법을 도입하여 모델을 실시간으로 업데이트할 계획입니다.
+**2. Model & Horizon Expansion (모델 및 예측 기간 확장)**
+* **한계:** 현재는 LTSF(Long-Term Time Series Forecasting) 특화 모델들을 단기(7일) 예측에 주로 활용하고 있습니다.
+* **개선:**
+    * **Mamba** 등 최신 시계열 예측 모델을 도입하여 실험 범위를 확장할 수 있습니다.
+    * 단기 예측(Short-term) 전용 모델과 더 긴 시점(Long-term)을 예측하는 모델을 구분하여 포트폴리오를 다각화하는 방향이 필요합니다.
 
-**3. Execution Strategy**
-* **한계:** 현재는 단순 임계값(Threshold) 기반의 매수/매도 시그널만 제공하며, 실제 호가창(Orderbook) 상황을 반영하지 않습니다.
-* **개선:** 강화학습(Reinforcement Learning) 에이전트를 도입하여 슬리피지(Slippage)와 수수료를 고려한 최적의 주문 집행(Execution) 전략을 연구 중입니다.
+**3. Fully Automated Execution (완전 자동 매매)**
+* **한계:** 현재 시스템은 매수/매도 시그널을 알림으로 보내주는 단계까지만 수행하며, 실제 주문은 사용자가 직접 해야 합니다.
+* **개선:** **Upbit**나 Binance 같은 거래소 API를 연동하여, 시그널 발생 시 실제로 매매가 체결되는 **완전 자동화된 트레이딩 봇(Auto-Trading Bot)**으로 고도화가 가능합니다.
 
----
+**4. Advanced Trading Strategies (전문 트레이딩 전략 고도화)**
+* **한계:** 현재는 예측 수익률이 일정 수준을 넘는지 판단하는 단순한 임계값(Threshold) 전략을 사용하고 있습니다.
+* **개선:** 이동평균 교차(MA Crossover), 볼린저 밴드, RSI 등 다양한 기술적 지표를 결합하거나, 변동성 돌파와 같은 **전문적인 퀀트 트레이딩 전략**을 도입하여 수익 안정성을 높일 수 있습니다.
 
-## ⚠️ Disclaimer
+## ⚠️ Notice
 이 프로젝트는 데이터 분석 연구 및 학습 목적으로 개발되었습니다. **제공되는 모든 예측 및 시뮬레이션 결과는 실제 투자를 권유하는 것이 아니며, 투자에 대한 모든 책임은 사용자에게 있습니다.**
 
 ---
 
-**Developed by Hajungmin**
-*ToBigs Conference TSF 2025*
+**Developed by jeongmin Ha**
+*ToBigs Conference 2026*
