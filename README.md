@@ -13,6 +13,13 @@
 
 단순히 미래 가격을 예측하는 것을 넘어, **TimeSHAP**, **Counterfactual Simulator**를 통해 예측의 근거를 설명하고 **LLM**을 통해 복잡한 분석 결과를 알기 쉽게 해석합니다. 특히, **임계값(Threshold) 기반 투자 전략**을 적용하여 노이즈를 필터링하고 확실한 수익 기회에만 매매 시그널을 생성합니다.
 
+<br>
+
+<a href="https://btc-fcst.streamlit.app/">
+  <img src="https://github.com/Hipposdata/BTC_FCST/blob/main/btc-lstm-project/assets/demo_full_screen.png?raw=true" alt="TOBIT Dashboard" width="70%">
+</a>
+
+### 🔗 [Live Demo App 바로가기](https://btc-fcst.streamlit.app/)
 ---
 
 ## 📑 Contents
