@@ -100,7 +100,7 @@ graph TD
     %% Automated Path
     subgraph "🤖 Automated Trading Pipeline"
     S["📅 Scheduler<br/>(Cron / GitHub Actions)"] -->|Trigger| C
-    C -->|"예상 수익률 %<br/>(Pred Return)"| STR{"⚖️ Investment<br/>Strategy"}
+    C -->|"Forecast"| STR{"⚖️ Investment<br/>Strategy"}
     STR --"|예상 수익률| > 5%"--> BUY["🔥 Strong<br/>Buy/Sell Signal"]
     STR --"|예상 수익률| <= 5%"--> HOLD["✋ Hold<br/>"]
     
