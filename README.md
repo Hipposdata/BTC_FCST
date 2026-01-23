@@ -35,7 +35,7 @@
 
 | **Discord Notification** | **Strategy Backtest** |
 |:---:|:---:|
-| <img src="assets/demo_alarm_discord.png" alt="Discord Bot" width="100%"> | <img src="assets/demo_backtest.png" alt="Backtest" width="100%"> |
+| <img src="assets/demo_alarm_discord.png" alt="Discord Bot" width="100%"> | <img src="assets/demo_back_score.png" alt="Backtest" width="100%"> |
 | 매일 아침 전송되는 투자 전략 리포트 | 매수/매도 시뮬레이션 및 수익률 검증 |
 
 ---
