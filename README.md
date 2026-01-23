@@ -37,7 +37,7 @@
 
 | **1. Market Forecast** | **2. Model Architecture & Specs** |
 |:---:|:---:|
-| <img src="https://github.com/Hipposdata/BTC_FCST/blob/main/btc-lstm-project/assets/demo_forecast.png?raw=true" alt="Forecast" width="100%"> | <img src="https://github.com/Hipposdata/BTC_FCST/blob/main/btc-lstm-project/assets/demo_model_spec.png?raw=true" alt="Model Arch" width="48%"> <img src="https://github.com/Hipposdata/BTC_FCST/blob/main/btc-lstm-project/assets/demo_model_spec_table.png?raw=true" alt="Model Table" width="48%"> |
+| <img src="https://github.com/Hipposdata/BTC_FCST/blob/main/btc-lstm-project/assets/demo_forecast.png?raw=true" alt="Forecast" width="100%"> | <img src="https://github.com/Hipposdata/BTC_FCST/blob/main/btc-lstm-project/assets/demo_model_spec.png?raw=true" alt="Model Arch" width="120%"> |
 | 실시간 가격 예측 및 경제 지표 대시보드 | 6가지 시계열 모델 구조 시각화 및 파라미터 명세 |
 
 | **3. Deep Insight (XAI - LLM)** | **4. Deep Insight (XAI - Detail)** |
