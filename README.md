@@ -99,12 +99,13 @@ graph TD
     
     %% Automated Path
     subgraph "🤖 Automated Trading Pipeline"
-    S["📅 Scheduler<br/>(Cron / GitHub Actions)"] -->|Trigger| D[Daily Bot]
-    D --> C
+    S["📅 Scheduler<br/>(Cron / GitHub Actions)"] -->|Trigger| C
     C -->|"예상 수익률 %<br/>(Pred Return)"| STR{"⚖️ Investment<br/>Strategy"}
-    STR --"|수익률(Return| > 5%"--> BUY["🔥 Strong<br/>Buy/Sell Signal"]
-    STR --"|수익률(Return| <= 5%"--> HOLD["✋ Hold<br/>"]
-    BUY & HOLD -->|Report| WEB["🔔 Discord<br/>Webhook"]
+    STR --"|예상 수익률| > 5%"--> BUY["🔥 Strong<br/>Buy/Sell Signal"]
+    STR --"|예상 수익률| <= 5%"--> HOLD["✋ Hold<br/>"]
+    
+    BUY & HOLD -->|Make Report| D[Daily Bot]
+    D -->|Send Notification| WEB["🔔 Discord<br/>Webhook"]
     end
     
     %% Dashboard Path
